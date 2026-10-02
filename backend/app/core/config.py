@@ -2,10 +2,11 @@
 VisionMate v2 - Global Configuration Settings
 """
 
-import os
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     APP_NAME: str = "VisionMate v2"
     APP_VERSION: str = "2.0.0"
     DEBUG: bool = True
@@ -14,9 +15,11 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # Camera Settings (ESP32-CAM is the only primary production camera provider)
-    CAMERA_SOURCE: str = "esp32"  # 'esp32' (default & only production provider)
+    # Camera Settings — switch by config, never hard-code in feature code
+    CAMERA_SOURCE: str = "esp32"  # esp32 | webcam | mock
     WEBCAM_INDEX: int = 0
+    TOF_SOURCE: str = "mock"      # mock | vl53l5cx
+    GPS_SOURCE: str = "mock"      # mock | browser | hardware
     CAMERA_FRAME_WIDTH: int = 640
     CAMERA_FRAME_HEIGHT: int = 480
     FRAME_BUFFER_DEPTH: int = 1  # Discard stale frames, consume latest only
@@ -58,6 +61,20 @@ class Settings(BaseSettings):
     # Audio & TTS
     TTS_DEFAULT_RATE: int = 2  # SAPI voice rate (-10 to 10)
     TTS_VOLUME: int = 100
+
+    # ASR / real-time voice (Whisper loaded once, reused)
+    ASR_MODEL: str = "tiny.en"
+    ASR_DEVICE: str = "cpu"
+    ASR_COMPUTE_TYPE: str = "int8"
+    ASR_SAMPLE_RATE: int = 16000
+    VOICE_LISTENER_ENABLED: bool = True
+    VAD_FRAME_MS: int = 30
+    VAD_SPEECH_START_RMS: float = 0.018
+    VAD_SPEECH_END_RMS: float = 0.010
+    VAD_MIN_SPEECH_MS: int = 250
+    VAD_SILENCE_END_MS: int = 550
+    VAD_MAX_UTTERANCE_MS: int = 8000
+    VAD_PRE_ROLL_MS: int = 240
 
 settings = Settings()
 

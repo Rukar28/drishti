@@ -42,6 +42,31 @@ def test_fastapi_core_endpoints(test_client):
     # Accept either the renamed field 'processed_fps' or legacy 'effective_fps'
     assert "processed_fps" in metrics or "effective_fps" in metrics
 
+def test_prd_api_aliases(test_client):
+    res = test_client.get("/api/health")
+    assert res.status_code == 200
+    assert res.json()["status"] == "HEALTHY"
+
+    res = test_client.get("/api/world")
+    assert res.status_code == 200
+    world = res.json()
+    assert "mode" in world
+    assert "objects" in world
+    assert "hazards" in world
+    assert world.get("navigation") is None or isinstance(world.get("navigation"), dict)
+
+    res = test_client.post("/api/voice/command", json={"transcript": "find my bottle"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["intent"] == "FIND"
+    assert data["target"] == "bottle"
+    assert data["status"] == "started"
+
+    res = test_client.post("/api/stop")
+    assert res.status_code == 200
+    assert res.json()["status"] == "STOPPED"
+
+
 def test_mode_switching_api(test_client):
     # Switch to Guidance / Awareness
     res = test_client.post("/api/v1/mode", json={"mode": "guidance"})

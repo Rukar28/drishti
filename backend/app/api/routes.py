@@ -168,3 +168,75 @@ def stop_speech() -> Dict[str, Any]:
     pipeline.tts.stop()
     return {"status": "SUCCESS", "message": "Speech interrupted."}
 
+
+# PRD aliases — existing /health, /status, /api/v1/* remain the source of truth.
+
+@router.get("/api/health")
+def api_health() -> Dict[str, Any]:
+    return get_health()
+
+
+@router.get("/api/status")
+def api_status() -> Dict[str, Any]:
+    data = get_status()
+    data["voice_state"] = pipeline.voice_state
+    data["depth"] = pipeline.depth.health()
+    data["gps"] = pipeline.gps.health()
+    return data
+
+
+@router.get("/api/world")
+def api_world() -> Dict[str, Any]:
+    return pipeline.public_world_view()
+
+
+@router.get("/api/camera")
+def api_camera() -> Dict[str, Any]:
+    return pipeline.get_subsystems_health().get("camera", {})
+
+
+@router.get("/api/voice")
+def api_voice() -> Dict[str, Any]:
+    return {
+        "state": pipeline.voice_state,
+        "asr": pipeline.get_subsystems_health().get("asr", {}),
+        "speaking": pipeline.tts.is_speaking(),
+        "capture": "vad",
+    }
+
+
+@router.post("/api/voice/command")
+def api_voice_command(req: VoiceCommandRequest) -> Dict[str, Any]:
+    return pipeline.handle_voice_command(req.transcript)
+
+
+@router.post("/api/find")
+def api_find(req: FindRequest) -> Dict[str, Any]:
+    return trigger_find(req)
+
+
+@router.post("/api/read")
+def api_read(req: ReadRequest = ReadRequest()) -> Dict[str, Any]:
+    return trigger_read(req)
+
+
+@router.post("/api/ask")
+def api_ask(req: AskRequest) -> Dict[str, Any]:
+    return trigger_ask(req)
+
+
+@router.post("/api/stop")
+def api_stop() -> Dict[str, Any]:
+    return stop_all()
+
+
+@router.get("/api/safety")
+def api_safety() -> Dict[str, Any]:
+    view = pipeline.public_world_view()
+    return {"hazards": view["hazards"], "mode": view["mode"]}
+
+
+@router.get("/api/location")
+def api_location() -> Dict[str, Any]:
+    return pipeline.gps.get_location()
+

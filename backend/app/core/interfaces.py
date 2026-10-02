@@ -118,10 +118,48 @@ class TTSProvider(ABC):
 
 
 class ASRProvider(ABC):
-    """Abstract interface for local streaming speech-to-text."""
+    """Abstract interface for local speech-to-text (chunk or VAD utterance)."""
     @abstractmethod
     def listen_chunk(self, pcm_audio: np.ndarray) -> Optional[str]:
-        """Transcribes incoming audio stream chunk."""
+        """Transcribes an already-captured PCM utterance."""
+        pass
+
+    def preload(self) -> None:
+        """Load the ASR model once. Implementations must never reload per command."""
+        return None
+
+    def listen_utterance(self, stop_flag=None) -> Optional[str]:
+        """Capture one VAD-bounded utterance and transcribe it."""
+        return None
+
+
+class DepthProvider(ABC):
+    """ToF / depth sensor abstraction. Missing hardware must report DEMO MODE."""
+    @abstractmethod
+    def get_depth(self) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def get_zones(self) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def get_distance(self, direction: str) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def health(self) -> Dict[str, Any]:
+        pass
+
+
+class GPSProvider(ABC):
+    """Location provider. Missing hardware must report DEMO MODE / NOT CONNECTED."""
+    @abstractmethod
+    def get_location(self) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    def health(self) -> Dict[str, Any]:
         pass
 
 
