@@ -1,0 +1,645 @@
+{
+  "benchmark": "Resource Utilization & Bottleneck Analysis",
+  "timestamp": "2026-09-17T12:39:05.643312",
+  "gpu_name": "NVIDIA GeForce RTX 5050 Laptop GPU",
+  "pid": 14600,
+  "telemetry_samples": [
+    {
+      "time_offset_sec": 0.0,
+      "process_cpu_pct": 0.0,
+      "system_cpu_pct": 0.0,
+      "process_ram_mb": 1665.36,
+      "system_ram_free_mb": 2764.22,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 0.27,
+      "process_cpu_pct": 111.6,
+      "system_cpu_pct": 54.0,
+      "process_ram_mb": 1665.38,
+      "system_ram_free_mb": 2747.82,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 0.5,
+      "process_cpu_pct": 86.8,
+      "system_cpu_pct": 46.0,
+      "process_ram_mb": 1665.39,
+      "system_ram_free_mb": 2772.73,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 0.71,
+      "process_cpu_pct": 92.8,
+      "system_cpu_pct": 45.1,
+      "process_ram_mb": 1665.39,
+      "system_ram_free_mb": 2731.41,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 0.95,
+      "process_cpu_pct": 93.1,
+      "system_cpu_pct": 44.6,
+      "process_ram_mb": 1665.39,
+      "system_ram_free_mb": 2741.07,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 1.19,
+      "process_cpu_pct": 86.8,
+      "system_cpu_pct": 47.4,
+      "process_ram_mb": 1665.39,
+      "system_ram_free_mb": 2717.85,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 1.42,
+      "process_cpu_pct": 106.8,
+      "system_cpu_pct": 40.8,
+      "process_ram_mb": 1665.4,
+      "system_ram_free_mb": 2715.59,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 1.65,
+      "process_cpu_pct": 114.2,
+      "system_cpu_pct": 47.7,
+      "process_ram_mb": 1665.41,
+      "system_ram_free_mb": 2722.69,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 1.86,
+      "process_cpu_pct": 78.5,
+      "system_cpu_pct": 41.7,
+      "process_ram_mb": 1665.42,
+      "system_ram_free_mb": 2717.26,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 2.11,
+      "process_cpu_pct": 106.2,
+      "system_cpu_pct": 46.6,
+      "process_ram_mb": 1665.42,
+      "system_ram_free_mb": 2698.16,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 2.34,
+      "process_cpu_pct": 100.2,
+      "system_cpu_pct": 45.1,
+      "process_ram_mb": 1665.42,
+      "system_ram_free_mb": 2716.19,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 2.58,
+      "process_cpu_pct": 99.7,
+      "system_cpu_pct": 43.9,
+      "process_ram_mb": 1665.43,
+      "system_ram_free_mb": 2707.1,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 2.83,
+      "process_cpu_pct": 100.0,
+      "system_cpu_pct": 41.2,
+      "process_ram_mb": 1665.43,
+      "system_ram_free_mb": 2705.0,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 3.06,
+      "process_cpu_pct": 106.8,
+      "system_cpu_pct": 36.3,
+      "process_ram_mb": 1665.43,
+      "system_ram_free_mb": 2705.41,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 3.29,
+      "process_cpu_pct": 107.0,
+      "system_cpu_pct": 39.3,
+      "process_ram_mb": 1665.45,
+      "system_ram_free_mb": 2702.48,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 3.5,
+      "process_cpu_pct": 93.2,
+      "system_cpu_pct": 31.4,
+      "process_ram_mb": 1665.45,
+      "system_ram_free_mb": 2699.27,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 3.72,
+      "process_cpu_pct": 107.0,
+      "system_cpu_pct": 39.6,
+      "process_ram_mb": 1665.45,
+      "system_ram_free_mb": 2681.45,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 3.93,
+      "process_cpu_pct": 99.9,
+      "system_cpu_pct": 46.9,
+      "process_ram_mb": 1665.46,
+      "system_ram_free_mb": 2540.04,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 4.18,
+      "process_cpu_pct": 93.5,
+      "system_cpu_pct": 47.8,
+      "process_ram_mb": 1665.46,
+      "system_ram_free_mb": 2611.61,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 4.4,
+      "process_cpu_pct": 86.4,
+      "system_cpu_pct": 57.9,
+      "process_ram_mb": 1665.46,
+      "system_ram_free_mb": 2635.79,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 4.64,
+      "process_cpu_pct": 93.5,
+      "system_cpu_pct": 42.7,
+      "process_ram_mb": 1665.46,
+      "system_ram_free_mb": 2492.2,
+      "gpu_utilization_pct": 8.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 4.88,
+      "process_cpu_pct": 80.1,
+      "system_cpu_pct": 51.2,
+      "process_ram_mb": 1665.47,
+      "system_ram_free_mb": 2515.62,
+      "gpu_utilization_pct": 8.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 5.13,
+      "process_cpu_pct": 100.0,
+      "system_cpu_pct": 47.0,
+      "process_ram_mb": 1665.47,
+      "system_ram_free_mb": 2645.84,
+      "gpu_utilization_pct": 9.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 5.37,
+      "process_cpu_pct": 99.7,
+      "system_cpu_pct": 41.4,
+      "process_ram_mb": 1665.48,
+      "system_ram_free_mb": 2644.07,
+      "gpu_utilization_pct": 9.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 5.58,
+      "process_cpu_pct": 85.6,
+      "system_cpu_pct": 42.3,
+      "process_ram_mb": 1665.48,
+      "system_ram_free_mb": 2643.82,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 5.82,
+      "process_cpu_pct": 93.5,
+      "system_cpu_pct": 43.2,
+      "process_ram_mb": 1665.48,
+      "system_ram_free_mb": 2647.02,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 6.03,
+      "process_cpu_pct": 107.0,
+      "system_cpu_pct": 40.7,
+      "process_ram_mb": 1665.48,
+      "system_ram_free_mb": 2640.2,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 6.24,
+      "process_cpu_pct": 107.8,
+      "system_cpu_pct": 42.5,
+      "process_ram_mb": 1665.49,
+      "system_ram_free_mb": 2637.33,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 6.46,
+      "process_cpu_pct": 92.8,
+      "system_cpu_pct": 34.8,
+      "process_ram_mb": 1665.49,
+      "system_ram_free_mb": 2635.56,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 6.67,
+      "process_cpu_pct": 100.3,
+      "system_cpu_pct": 42.9,
+      "process_ram_mb": 1665.5,
+      "system_ram_free_mb": 2634.45,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 6.88,
+      "process_cpu_pct": 100.1,
+      "system_cpu_pct": 34.3,
+      "process_ram_mb": 1665.5,
+      "system_ram_free_mb": 2633.67,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 7.1,
+      "process_cpu_pct": 99.9,
+      "system_cpu_pct": 42.4,
+      "process_ram_mb": 1665.5,
+      "system_ram_free_mb": 2630.36,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 7.36,
+      "process_cpu_pct": 88.1,
+      "system_cpu_pct": 54.5,
+      "process_ram_mb": 1665.51,
+      "system_ram_free_mb": 2625.34,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 7.58,
+      "process_cpu_pct": 99.9,
+      "system_cpu_pct": 59.6,
+      "process_ram_mb": 1665.51,
+      "system_ram_free_mb": 2615.32,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 7.86,
+      "process_cpu_pct": 94.5,
+      "system_cpu_pct": 50.0,
+      "process_ram_mb": 1665.51,
+      "system_ram_free_mb": 2659.27,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 8.1,
+      "process_cpu_pct": 93.5,
+      "system_cpu_pct": 37.6,
+      "process_ram_mb": 1665.52,
+      "system_ram_free_mb": 2659.8,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 8.32,
+      "process_cpu_pct": 107.0,
+      "system_cpu_pct": 43.5,
+      "process_ram_mb": 1665.52,
+      "system_ram_free_mb": 2663.89,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 8.54,
+      "process_cpu_pct": 99.9,
+      "system_cpu_pct": 39.6,
+      "process_ram_mb": 1665.52,
+      "system_ram_free_mb": 2656.01,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 8.76,
+      "process_cpu_pct": 93.5,
+      "system_cpu_pct": 34.7,
+      "process_ram_mb": 1665.53,
+      "system_ram_free_mb": 2651.81,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 8.98,
+      "process_cpu_pct": 92.8,
+      "system_cpu_pct": 38.0,
+      "process_ram_mb": 1665.54,
+      "system_ram_free_mb": 2651.08,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 9.23,
+      "process_cpu_pct": 100.2,
+      "system_cpu_pct": 37.5,
+      "process_ram_mb": 1665.54,
+      "system_ram_free_mb": 2649.19,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 9.46,
+      "process_cpu_pct": 79.8,
+      "system_cpu_pct": 51.0,
+      "process_ram_mb": 1665.54,
+      "system_ram_free_mb": 2649.21,
+      "gpu_utilization_pct": 10.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 9.67,
+      "process_cpu_pct": 115.5,
+      "system_cpu_pct": 39.7,
+      "process_ram_mb": 1665.54,
+      "system_ram_free_mb": 2650.67,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 9.89,
+      "process_cpu_pct": 93.5,
+      "system_cpu_pct": 40.0,
+      "process_ram_mb": 1665.54,
+      "system_ram_free_mb": 2651.98,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 10.1,
+      "process_cpu_pct": 107.8,
+      "system_cpu_pct": 33.6,
+      "process_ram_mb": 1665.55,
+      "system_ram_free_mb": 2651.83,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 10.32,
+      "process_cpu_pct": 93.1,
+      "system_cpu_pct": 38.9,
+      "process_ram_mb": 1665.55,
+      "system_ram_free_mb": 2653.79,
+      "gpu_utilization_pct": 12.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 10.54,
+      "process_cpu_pct": 100.3,
+      "system_cpu_pct": 38.3,
+      "process_ram_mb": 1665.55,
+      "system_ram_free_mb": 2651.65,
+      "gpu_utilization_pct": 14.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 10.75,
+      "process_cpu_pct": 84.7,
+      "system_cpu_pct": 40.2,
+      "process_ram_mb": 1665.55,
+      "system_ram_free_mb": 2649.13,
+      "gpu_utilization_pct": 14.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 10.97,
+      "process_cpu_pct": 99.9,
+      "system_cpu_pct": 44.0,
+      "process_ram_mb": 1665.56,
+      "system_ram_free_mb": 2650.31,
+      "gpu_utilization_pct": 14.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 11.18,
+      "process_cpu_pct": 99.9,
+      "system_cpu_pct": 38.5,
+      "process_ram_mb": 1665.57,
+      "system_ram_free_mb": 2650.48,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 11.39,
+      "process_cpu_pct": 92.4,
+      "system_cpu_pct": 31.8,
+      "process_ram_mb": 1665.57,
+      "system_ram_free_mb": 2645.64,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 11.63,
+      "process_cpu_pct": 86.8,
+      "system_cpu_pct": 39.3,
+      "process_ram_mb": 1665.57,
+      "system_ram_free_mb": 2643.96,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 11.85,
+      "process_cpu_pct": 99.9,
+      "system_cpu_pct": 43.9,
+      "process_ram_mb": 1665.58,
+      "system_ram_free_mb": 2626.97,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 12.08,
+      "process_cpu_pct": 106.4,
+      "system_cpu_pct": 45.1,
+      "process_ram_mb": 1665.58,
+      "system_ram_free_mb": 2629.72,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 12.3,
+      "process_cpu_pct": 100.3,
+      "system_cpu_pct": 47.5,
+      "process_ram_mb": 1665.58,
+      "system_ram_free_mb": 2621.11,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 12.51,
+      "process_cpu_pct": 100.1,
+      "system_cpu_pct": 45.6,
+      "process_ram_mb": 1665.58,
+      "system_ram_free_mb": 2630.28,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 12.71,
+      "process_cpu_pct": 91.9,
+      "system_cpu_pct": 37.1,
+      "process_ram_mb": 1665.59,
+      "system_ram_free_mb": 2645.05,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 12.92,
+      "process_cpu_pct": 100.3,
+      "system_cpu_pct": 40.7,
+      "process_ram_mb": 1665.59,
+      "system_ram_free_mb": 2656.09,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 13.14,
+      "process_cpu_pct": 99.9,
+      "system_cpu_pct": 40.6,
+      "process_ram_mb": 1665.6,
+      "system_ram_free_mb": 2666.8,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 13.35,
+      "process_cpu_pct": 115.5,
+      "system_cpu_pct": 40.3,
+      "process_ram_mb": 1665.6,
+      "system_ram_free_mb": 2645.18,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 13.57,
+      "process_cpu_pct": 99.9,
+      "system_cpu_pct": 33.5,
+      "process_ram_mb": 1665.6,
+      "system_ram_free_mb": 2635.52,
+      "gpu_utilization_pct": 14.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 13.78,
+      "process_cpu_pct": 92.8,
+      "system_cpu_pct": 34.4,
+      "process_ram_mb": 1665.61,
+      "system_ram_free_mb": 2631.08,
+      "gpu_utilization_pct": 14.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 13.99,
+      "process_cpu_pct": 100.1,
+      "system_cpu_pct": 36.9,
+      "process_ram_mb": 1665.61,
+      "system_ram_free_mb": 2632.09,
+      "gpu_utilization_pct": 14.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 14.21,
+      "process_cpu_pct": 107.0,
+      "system_cpu_pct": 29.7,
+      "process_ram_mb": 1665.61,
+      "system_ram_free_mb": 2626.69,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 14.42,
+      "process_cpu_pct": 86.0,
+      "system_cpu_pct": 31.6,
+      "process_ram_mb": 1665.62,
+      "system_ram_free_mb": 2626.95,
+      "gpu_utilization_pct": 13.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 14.63,
+      "process_cpu_pct": 100.1,
+      "system_cpu_pct": 35.7,
+      "process_ram_mb": 1665.62,
+      "system_ram_free_mb": 2623.35,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    },
+    {
+      "time_offset_sec": 14.84,
+      "process_cpu_pct": 107.0,
+      "system_cpu_pct": 34.2,
+      "process_ram_mb": 1665.62,
+      "system_ram_free_mb": 2622.98,
+      "gpu_utilization_pct": 11.0,
+      "gpu_vram_used_mib": 146.0
+    }
+  ],
+  "summary": {
+    "duration_seconds": 15.0,
+    "total_frames_processed": 747,
+    "effective_fps": 49.8,
+    "latency_stats_ms": {
+      "mean": 20.08,
+      "median": 19.45,
+      "p95": 26.82,
+      "p99": 31.14,
+      "min": 12.62,
+      "max": 54.46
+    },
+    "process_cpu_pct": {
+      "mean": 97.9,
+      "max": 115.5
+    },
+    "system_cpu_pct": {
+      "mean": 41.13,
+      "max": 59.6
+    },
+    "process_ram_mb": {
+      "mean": 1665.51,
+      "max": 1665.62
+    },
+    "gpu_utilization_pct": {
+      "mean": 11.49,
+      "max": 14.0
+    },
+    "gpu_vram_used_mib": {
+      "mean": 146.0,
+      "peak": 146.0
+    },
+    "primary_bottleneck_analysis": "CPU Bound"
+  }
+}

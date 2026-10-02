@@ -1,0 +1,25 @@
+{
+  "benchmark": "CUDA Environment Validation",
+  "timestamp": "2026-09-17T12:37:52.235724",
+  "python_version": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "interpreter": "C:\\Users\\Srushti Gole\\VisionMate-v2\\.venv\\Scripts\\python.exe",
+  "status": "PASSED",
+  "details": {
+    "pytorch_version": "2.12.0.dev20260408+cu128",
+    "cuda_available": true,
+    "device_count": 1,
+    "current_device_id": 0,
+    "gpu_name": "NVIDIA GeForce RTX 5050 Laptop GPU",
+    "compute_capability": "12.0",
+    "total_vram_mb": 8150.56,
+    "cuda_version": "12.8",
+    "cudnn_version": "92000",
+    "matmul_4096_fp32_ms": 58.259,
+    "matmul_4096_fp32_tflops": 2.36,
+    "matmul_4096_fp16_ms": 12.649,
+    "matmul_4096_fp16_tflops": 10.87,
+    "vram_allocated_mb": 320.0,
+    "vram_reserved_mb": 352.0,
+    "vram_peak_mb": 352.0
+  }
+}

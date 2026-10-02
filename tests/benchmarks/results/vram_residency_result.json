@@ -1,0 +1,63 @@
+{
+  "benchmark": "GPU VRAM Residency & Lifecycle",
+  "timestamp": "2026-09-17T12:38:01.431914",
+  "python_version": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "interpreter": "C:\\Users\\Srushti Gole\\VisionMate-v2\\.venv\\Scripts\\python.exe",
+  "measurements": {
+    "1_system_baseline_nvidia_smi": {
+      "total_mib": 8151.0,
+      "used_mib": 0.0,
+      "free_mib": 7910.0
+    },
+    "2_cuda_init": {
+      "nvidia_smi_used_mib": 0.0,
+      "torch_allocated_mb": 0.0,
+      "torch_reserved_mb": 0.0,
+      "cuda_context_overhead_mib": 0.0
+    },
+    "3_yolo_model_loaded": {
+      "model_name": "yolov8n.pt",
+      "load_time_sec": 25.147,
+      "nvidia_smi_used_mib": 108.0,
+      "torch_allocated_mb": 12.25,
+      "torch_reserved_mb": 32.0,
+      "model_weight_vram_mb": 12.25
+    },
+    "4_first_inference_warmup": {
+      "nvidia_smi_used_mib": 142.0,
+      "torch_allocated_mb": 23.85,
+      "torch_reserved_mb": 46.0
+    },
+    "5_continuous_inference_100_runs": {
+      "alloc_history_checkpoints_mb": [
+        18.32,
+        18.32,
+        18.32,
+        18.32,
+        18.32
+      ],
+      "reserved_history_checkpoints_mb": [
+        46.0,
+        46.0,
+        46.0,
+        46.0,
+        46.0
+      ],
+      "memory_growth_mb": 0.0,
+      "memory_leak_detected": false,
+      "peak_torch_allocated_mb": 27.13,
+      "peak_torch_reserved_mb": 46.0,
+      "nvidia_smi_used_mib": 142.0,
+      "vram_headroom_remaining_mib": 8008.56
+    },
+    "6_cleanup_and_release": {
+      "nvidia_smi_used_mib": 96.0,
+      "torch_allocated_mb": 0.0,
+      "torch_reserved_mb": 0.0,
+      "memory_reclaimed_mb": 46.0
+    }
+  },
+  "gpu_name": "NVIDIA GeForce RTX 5050 Laptop GPU",
+  "total_vram_mb": 8150.56,
+  "status": "PASSED"
+}

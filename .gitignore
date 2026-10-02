@@ -1,0 +1,18 @@
+# Virtual env
+.venv/
+
+# Pytest
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# ESP32 firmware secrets
+firmware/visionmate_esp32cam/secrets.h
+
+# Local env
+.env
+
+# Logs and archives
+logs/
+*.zip
+*.log

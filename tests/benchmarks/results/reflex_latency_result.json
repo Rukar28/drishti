@@ -1,0 +1,183 @@
+{
+  "benchmark": "Fast Reflex Latency Benchmark",
+  "timestamp": "2026-09-17T12:38:46.276415",
+  "gpu_name": "NVIDIA GeForce RTX 5050 Laptop GPU",
+  "configurations": [
+    {
+      "config_name": "640x480_FP16",
+      "resolution": "640x480",
+      "precision": "FP16",
+      "iterations_sampled": 100,
+      "preprocess_stats": {
+        "mean_ms": 1.397,
+        "median_ms": 1.241,
+        "p95_ms": 1.96,
+        "p99_ms": 2.939,
+        "min_ms": 0.916,
+        "max_ms": 8.643,
+        "std_ms": 0.804
+      },
+      "inference_stats": {
+        "mean_ms": 15.854,
+        "median_ms": 14.38,
+        "p95_ms": 22.218,
+        "p99_ms": 27.669,
+        "min_ms": 11.474,
+        "max_ms": 68.772,
+        "std_ms": 6.117
+      },
+      "postprocess_stats": {
+        "mean_ms": 1.288,
+        "median_ms": 1.168,
+        "p95_ms": 2.252,
+        "p99_ms": 2.937,
+        "min_ms": 0.877,
+        "max_ms": 3.213,
+        "std_ms": 0.443
+      },
+      "total_detector_stats": {
+        "mean_ms": 19.269,
+        "median_ms": 17.776,
+        "p95_ms": 26.838,
+        "p99_ms": 33.043,
+        "min_ms": 14.477,
+        "max_ms": 79.328,
+        "std_ms": 6.964
+      },
+      "max_achievable_fps": 51.9,
+      "vram_peak_allocated_mb": 32.65
+    },
+    {
+      "config_name": "640x480_FP32",
+      "resolution": "640x480",
+      "precision": "FP32",
+      "iterations_sampled": 100,
+      "preprocess_stats": {
+        "mean_ms": 1.233,
+        "median_ms": 1.132,
+        "p95_ms": 1.937,
+        "p99_ms": 2.134,
+        "min_ms": 0.855,
+        "max_ms": 2.509,
+        "std_ms": 0.305
+      },
+      "inference_stats": {
+        "mean_ms": 13.888,
+        "median_ms": 13.783,
+        "p95_ms": 16.371,
+        "p99_ms": 18.163,
+        "min_ms": 11.281,
+        "max_ms": 18.375,
+        "std_ms": 1.561
+      },
+      "postprocess_stats": {
+        "mean_ms": 1.167,
+        "median_ms": 1.086,
+        "p95_ms": 1.576,
+        "p99_ms": 2.161,
+        "min_ms": 0.866,
+        "max_ms": 2.535,
+        "std_ms": 0.291
+      },
+      "total_detector_stats": {
+        "mean_ms": 16.985,
+        "median_ms": 16.76,
+        "p95_ms": 19.873,
+        "p99_ms": 21.12,
+        "min_ms": 13.856,
+        "max_ms": 21.41,
+        "std_ms": 1.653
+      },
+      "max_achievable_fps": 58.9,
+      "vram_peak_allocated_mb": 46.98
+    },
+    {
+      "config_name": "640x640_FP16",
+      "resolution": "640x640",
+      "precision": "FP16",
+      "iterations_sampled": 100,
+      "preprocess_stats": {
+        "mean_ms": 2.468,
+        "median_ms": 2.225,
+        "p95_ms": 4.361,
+        "p99_ms": 5.651,
+        "min_ms": 1.593,
+        "max_ms": 6.293,
+        "std_ms": 0.82
+      },
+      "inference_stats": {
+        "mean_ms": 14.376,
+        "median_ms": 13.86,
+        "p95_ms": 17.557,
+        "p99_ms": 19.015,
+        "min_ms": 11.571,
+        "max_ms": 19.386,
+        "std_ms": 1.754
+      },
+      "postprocess_stats": {
+        "mean_ms": 1.156,
+        "median_ms": 1.102,
+        "p95_ms": 1.671,
+        "p99_ms": 2.012,
+        "min_ms": 0.886,
+        "max_ms": 2.042,
+        "std_ms": 0.269
+      },
+      "total_detector_stats": {
+        "mean_ms": 18.679,
+        "median_ms": 18.27,
+        "p95_ms": 22.56,
+        "p99_ms": 23.486,
+        "min_ms": 15.022,
+        "max_ms": 23.671,
+        "std_ms": 2.022
+      },
+      "max_achievable_fps": 53.5,
+      "vram_peak_allocated_mb": 47.72
+    },
+    {
+      "config_name": "320x320_FP16",
+      "resolution": "320x320",
+      "precision": "FP16",
+      "iterations_sampled": 100,
+      "preprocess_stats": {
+        "mean_ms": 0.856,
+        "median_ms": 0.784,
+        "p95_ms": 1.225,
+        "p99_ms": 2.206,
+        "min_ms": 0.594,
+        "max_ms": 2.305,
+        "std_ms": 0.271
+      },
+      "inference_stats": {
+        "mean_ms": 15.441,
+        "median_ms": 14.969,
+        "p95_ms": 20.626,
+        "p99_ms": 22.306,
+        "min_ms": 11.474,
+        "max_ms": 22.931,
+        "std_ms": 2.593
+      },
+      "postprocess_stats": {
+        "mean_ms": 1.153,
+        "median_ms": 1.09,
+        "p95_ms": 1.602,
+        "p99_ms": 1.955,
+        "min_ms": 0.858,
+        "max_ms": 2.101,
+        "std_ms": 0.26
+      },
+      "total_detector_stats": {
+        "mean_ms": 18.141,
+        "median_ms": 17.67,
+        "p95_ms": 23.476,
+        "p99_ms": 24.845,
+        "min_ms": 13.623,
+        "max_ms": 27.514,
+        "std_ms": 2.875
+      },
+      "max_achievable_fps": 55.1,
+      "vram_peak_allocated_mb": 38.99
+    }
+  ]
+}

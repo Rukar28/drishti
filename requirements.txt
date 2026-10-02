@@ -1,0 +1,14 @@
+# VisionMate v2 - Phase 1 Core Dependencies
+# Install PyTorch with CUDA index first or via:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+
+opencv-python>=4.10.0
+ultralytics>=8.3.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+numpy>=1.26.0,<2.1.0
+pydantic>=2.8.0
+sounddevice>=0.5.0
+pywin32>=306
+psutil>=6.0.0
+easyocr>=1.7.0
