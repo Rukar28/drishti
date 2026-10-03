@@ -16,3 +16,10 @@ sounddevice>=0.5.0
 pywin32>=306
 psutil>=6.0.0
 easyocr>=1.7.0
+
+# ── Optional: REAL local/offline wake-word engine ──────────────
+# Fully on-device acoustic keyword spotting (no cloud audio). If absent, the
+# backend automatically uses an explicit DEVELOPMENT FALLBACK wake mode and never
+# claims a real wake word. Install with:  pip install openwakeword
+# (requires onnxruntime, already pulled in by easyocr)
+# openwakeword>=0.6.0

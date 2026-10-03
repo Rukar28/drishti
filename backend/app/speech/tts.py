@@ -11,6 +11,7 @@ import time
 import logging
 from typing import Optional, Dict, Any
 from backend.app.core.interfaces import TTSProvider
+from backend.app.core.events import EventType, event_broker
 
 logger = logging.getLogger("visionmate.tts")
 
@@ -35,7 +36,13 @@ class WindowsSAPITTSProvider(TTSProvider):
         
         # Generation counter for atomic invalidation
         self.speech_generation = 1
-        
+
+        # Purge is performed ONLY on the dedicated COM worker thread. Caller
+        # threads (API/priority) must never touch the COM object directly, which
+        # can otherwise block for the full duration of the current utterance.
+        self._purge_requested = False
+        self._speaking_until = 0.0
+
         self._start_worker()
 
     def _start_worker(self):
@@ -59,6 +66,17 @@ class WindowsSAPITTSProvider(TTSProvider):
             self._voice = None
 
         while self._running:
+            # Honor any pending purge on the dedicated COM thread (non-blocking for callers).
+            if self._purge_requested:
+                self._purge_requested = False
+                if self._voice is not None:
+                    try:
+                        self._voice.Speak("", 2)  # SVSFPurgeBeforeSpeak
+                    except Exception:
+                        pass
+                self._is_speaking = False
+                self._speaking_until = 0.0
+
             try:
                 priority, gen_id, t_stamp, text, interrupt, source = self._queue.get(timeout=0.08)
                 
@@ -69,24 +87,47 @@ class WindowsSAPITTSProvider(TTSProvider):
                         continue
 
                 if text:
-                    self._is_speaking = True
                     logger.info(f"[TTS SPEAK P{priority} G{gen_id} {source}]: '{text}'")
+                    try:
+                        event_broker.publish(EventType.TTS_STARTED, {
+                            "text": text, "priority": priority, "source": source,
+                        })
+                    except Exception:
+                        pass
                     
                     if self._voice is not None:
                         try:
-                            # SVSFlagsAsync = 1, SVSFPurgeBeforeSpeak = 2
-                            if interrupt:
-                                self._voice.Speak(text, 2 | 1)
-                            else:
-                                self._voice.Speak(text, 0)
+                            # Always async (SVSFlagsAsync = 1) so the worker never blocks
+                            # and can act on purge/interrupt immediately. Interrupt adds
+                            # SVSFPurgeBeforeSpeak = 2.
+                            flags = 1 | (2 if interrupt else 0)
+                            self._voice.Speak(text, flags)
+                            self._is_speaking = True
+                            # Best-effort speaking window (no blocking COM poll).
+                            self._speaking_until = time.time() + min(15.0, max(0.4, len(text) * 0.06))
                         except Exception as ex:
                             logger.error(f"SAPI speak exception: {ex}")
                     else:
+                        self._is_speaking = True
                         time.sleep(min(1.0, len(text) * 0.04))
+                        self._is_speaking = False
 
-                    self._is_speaking = False
+                    if self._voice is None:
+                        try:
+                            event_broker.publish(EventType.TTS_FINISHED, {
+                                "text": text, "priority": priority, "source": source,
+                            })
+                        except Exception:
+                            pass
                     self._queue.task_done()
             except queue.Empty:
+                # Speech may have completed; refresh the best-effort speaking flag.
+                if self._is_speaking and time.time() >= self._speaking_until:
+                    self._is_speaking = False
+                    try:
+                        event_broker.publish(EventType.TTS_FINISHED, {"text": "", "priority": 0, "source": "SYSTEM"})
+                    except Exception:
+                        pass
                 continue
             except Exception as e:
                 logger.error(f"Unexpected error in TTS speech loop: {e}")
@@ -97,7 +138,7 @@ class WindowsSAPITTSProvider(TTSProvider):
             except Exception:
                 pass
 
-    def speak(self, text: str, priority: int = 2, interrupt: bool = False, source: str = "GUIDANCE", generation_id: Optional[int] = None) -> None:
+    def speak(self, text: str, priority: int = 5, interrupt: bool = False, source: str = "GUIDANCE", generation_id: Optional[int] = None) -> None:
         """
         Enqueues text for speech tagged with generation ID.
         If interrupt=True (e.g. STOP or Emergency Hazard), purges queue and cuts off current audio immediately.
@@ -115,19 +156,18 @@ class WindowsSAPITTSProvider(TTSProvider):
                 return
 
             if interrupt:
-                # Purge pending items
+                # Purge pending items (queue only). The COM purge is performed by
+                # the worker thread so this call never blocks the caller.
                 while not self._queue.empty():
                     try:
                         self._queue.get_nowait()
                         self._queue.task_done()
                     except Exception:
                         break
-                
-                if self._voice is not None:
-                    try:
-                        self._voice.Speak("", 2)  # SVSFPurgeBeforeSpeak
-                    except Exception:
-                        pass
+
+                self._is_speaking = False
+                self._speaking_until = 0.0
+                self._purge_requested = True
 
                 self._queue.put((0, current_gen, time.time(), clean_text, True, source))
             else:
@@ -147,12 +187,10 @@ class WindowsSAPITTSProvider(TTSProvider):
                 except Exception:
                     break
 
-            if self._voice is not None:
-                try:
-                    self._voice.Speak("", 2)  # SVSFPurgeBeforeSpeak halts audio instantly
-                except Exception:
-                    pass
+            # Defer the COM purge to the worker thread — never block the caller.
+            self._purge_requested = True
             self._is_speaking = False
+            self._speaking_until = 0.0
             logger.info(f"TTS globally stopped. Incremented to speech generation {self.speech_generation}.")
 
     def purge_mode_speech(self, source_to_purge: str) -> None:

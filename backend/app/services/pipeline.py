@@ -43,6 +43,11 @@ from backend.app.modes.find import FindModeHandler
 from backend.app.modes.read import ReadModeHandler
 from backend.app.modes.ask import AskModeHandler
 from backend.app.intelligence.command_bus import CommandBus
+from backend.app.speech.wakeword import WakeWordProvider, wake_word_provider as _default_wake_provider
+from backend.app.speech.voice_state import VoiceState, VoiceStateMachine
+from backend.app.reasoning.currency import CurrencyRecognizer
+from backend.app.reasoning.medicine import MedicineRecognizer
+from backend.app.navigation.navigator import Navigator
 from backend.app.schemas.world_state import SystemMode, WorldState
 
 logger = logging.getLogger("visionmate.pipeline")
@@ -51,7 +56,7 @@ logger = logging.getLogger("visionmate.pipeline")
 class VisionMatePipeline:
     """Master perceptual, voice, and reasoning pipeline."""
 
-    def __init__(self, camera_source: str = "webcam", **camera_kwargs):
+    def __init__(self, camera_source: str = "webcam", wake_provider: Optional[WakeWordProvider] = None, **camera_kwargs):
         self.camera_source_type = camera_source
         self.camera_kwargs = camera_kwargs
 
@@ -89,6 +94,9 @@ class VisionMatePipeline:
         self.find_handler = FindModeHandler(update_interval_sec=settings.FIND_MODE_UPDATE_INTERVAL_SEC)
         self.read_handler = ReadModeHandler(self.ocr)
         self.ask_handler = AskModeHandler(self.vlm)
+        self.currency_recognizer = CurrencyRecognizer(self.ocr)
+        self.medicine_recognizer = MedicineRecognizer(self.ocr)
+        self.navigator = Navigator()
 
         self.command_bus = CommandBus(self.asr.parse_intent)
         self._register_command_handlers()
@@ -97,7 +105,9 @@ class VisionMatePipeline:
         self._perception_thread: Optional[threading.Thread] = None
         self._voice_thread: Optional[threading.Thread] = None
         self._voice_running = False
-        self.voice_state = "LISTENING"
+        self.voice_state = "IDLE"
+        self.wake_provider: WakeWordProvider = wake_provider or _default_wake_provider
+        self.voice_fsm = VoiceStateMachine(on_change=self._on_voice_state_change)
         self._lock = threading.Lock()
 
         self._latest_annotated_frame = self._create_standby_frame(
@@ -117,10 +127,10 @@ class VisionMatePipeline:
         self.command_bus.register("ASK", self._cmd_ask)
         self.command_bus.register("GUIDANCE", self._cmd_guidance)
         self.command_bus.register("COLOR", self._cmd_not_available)
-        self.command_bus.register("MEDICINE", self._cmd_not_available)
-        self.command_bus.register("CURRENCY", self._cmd_not_available)
+        self.command_bus.register("MEDICINE", self._cmd_medicine)
+        self.command_bus.register("CURRENCY", self._cmd_currency)
         self.command_bus.register("FACE", self._cmd_not_available)
-        self.command_bus.register("NAVIGATION", self._cmd_not_available)
+        self.command_bus.register("NAVIGATION", self._cmd_navigation)
         self.command_bus.register("SOS", self._cmd_not_available)
 
     def _cmd_find(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
@@ -149,9 +159,47 @@ class VisionMatePipeline:
             "message": f"{intent} is not enabled in this backend phase.",
         }
 
-    def _set_voice_state(self, state: str) -> None:
-        self.voice_state = state
-        event_broker.publish(EventType.VOICE_STATE, {"state": state})
+    def _cmd_currency(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
+        res = self.trigger_currency()
+        return {"status": "started", "mode": "currency", "result": res}
+
+    def _cmd_medicine(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
+        res = self.trigger_medicine()
+        return {"status": "started", "mode": "medicine", "result": res}
+
+    def _cmd_navigation(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
+        raw = (parsed.get("raw_text") or "").lower()
+        destination = parsed.get("destination")
+
+        if "stop navigation" in raw or "cancel navigation" in raw:
+            return self.stop_navigation()
+
+        if "where am i" in raw or "where i am" in raw:
+            loc = self.gps.get_location()
+            origin = (loc.get("lat"), loc.get("lon"))
+            text = self.navigator.where_am_i(origin)
+            self.tts.speak(text, priority=PriorityLevel.INTERACTION, source="NAVIGATION")
+            return {"status": "ok", "mode": "navigation", "message": text}
+
+        if destination:
+            res = self.start_navigation(destination)
+            return {"status": res.get("status", "ok").lower(), "mode": "navigation", "result": res}
+
+        text = "Please tell me where to go. For example, navigate to home."
+        self.tts.speak(text, priority=PriorityLevel.INTERACTION, source="NAVIGATION")
+        return {"status": "needs_destination", "mode": "navigation", "message": text}
+
+    def _on_voice_state_change(self, state: VoiceState) -> None:
+        self.voice_state = state.value
+        event_broker.publish(EventType.VOICE_STATE, {"state": state.value})
+
+    def _set_voice_state(self, state) -> None:
+        """Back-compat setter. Prefer voice_fsm.transition() inside the loop."""
+        try:
+            vs = state if isinstance(state, VoiceState) else VoiceState(str(state).upper())
+        except ValueError:
+            vs = VoiceState.IDLE
+        self.voice_fsm.force(vs, reason="set_voice_state")
 
     def _create_standby_frame(self, message: str) -> np.ndarray:
         img = np.full((480, 640, 3), 20, dtype=np.uint8)
@@ -180,6 +228,10 @@ class VisionMatePipeline:
 
         voice_enabled = settings.VOICE_LISTENER_ENABLED and not os.environ.get("PYTEST_CURRENT_TEST")
         if voice_enabled:
+            try:
+                self.wake_provider.start()
+            except Exception as e:
+                logger.warning("[WAKE] Wake provider start failed: %s", e)
             self._voice_running = True
             self._voice_thread = threading.Thread(
                 target=self._voice_loop,
@@ -238,7 +290,17 @@ class VisionMatePipeline:
 
                 current_mode = world_state.current_mode
                 speech_cmd = None
-                if current_mode in [SystemMode.GUIDANCE, SystemMode.AWARENESS]:
+
+                # Depth/ToF proximity hazard — only fires when real hardware is connected.
+                depth_hazard = None
+                try:
+                    depth_hazard = self.priority_engine.evaluate_depth_hazard(self.depth.get_zones())
+                except Exception as e:
+                    logger.debug("[DEPTH] hazard evaluation error: %s", e)
+
+                if depth_hazard is not None:
+                    speech_cmd = depth_hazard
+                elif current_mode in [SystemMode.GUIDANCE, SystemMode.AWARENESS]:
                     speech_cmd = self.guidance_handler.process_frame_state(world_state)
                 elif current_mode == SystemMode.FIND:
                     hazard_event = self.priority_engine.evaluate_hazard(world_state)
@@ -254,6 +316,12 @@ class VisionMatePipeline:
                     src = speech_cmd.get("source", "GUIDANCE")
                     self.tts.speak(txt, priority=pri, interrupt=inter, source=src)
                     self.world_state_mgr.record_speech(txt)
+                    self._publish_hazard_if_any(speech_cmd, pri, src)
+
+                # GPS navigation voice guidance (updates only while actively guiding).
+                nav_update = self._navigation_tick()
+                if nav_update and nav_update.get("text"):
+                    self.tts.speak(nav_update["text"], priority=PriorityLevel.NAVIGATION, source="NAVIGATION")
 
                 self._draw_hud_annotations(frame, world_state)
                 self.frames_processed += 1
@@ -274,7 +342,12 @@ class VisionMatePipeline:
                 time.sleep(sleep_time)
 
     def _voice_loop(self):
-        logger.info("[VOICE] Command listener started (VAD, not fixed 3s chunks).")
+        wake_mode = "REAL_WAKE_WORD" if self.wake_provider.is_real_wake_word else self.wake_provider.mode
+        logger.info(
+            "[VOICE] Wake-word subsystem: %s (%s). Adaptive VAD capture, not fixed 3s chunks.",
+            self.wake_provider.name,
+            wake_mode,
+        )
         try:
             self.asr.preload()
         except Exception as e:
@@ -282,27 +355,92 @@ class VisionMatePipeline:
 
         while self._voice_running:
             try:
-                self._set_voice_state("LISTENING")
-                event_broker.publish(EventType.VOICE_STARTED, {"state": "LISTENING"})
+                self.voice_fsm.force(VoiceState.IDLE, "loop-start")
+                self.voice_fsm.transition(VoiceState.LISTENING_FOR_WAKE, "awaiting wake")
+
+                if not self.wake_provider.wait_for_wake(
+                    stop_flag=lambda: not self._voice_running,
+                    timeout=1.0,
+                ):
+                    continue
+
+                gen_at_wake = self.voice_fsm.generation
+                self.voice_fsm.transition(VoiceState.WAKE_DETECTED, "wake detected")
+                event_broker.publish(EventType.VOICE_STARTED, {
+                    "state": "WAKE_DETECTED",
+                    "wake_mode": wake_mode,
+                    "is_real_wake_word": self.wake_provider.is_real_wake_word,
+                })
+                if settings.WAKE_WORD_ACK_TEXT:
+                    self.tts.speak(
+                        settings.WAKE_WORD_ACK_TEXT,
+                        priority=PriorityLevel.USER_COMMAND,
+                        source="VOICE",
+                    )
+
+                self.voice_fsm.transition(VoiceState.LISTENING_FOR_COMMAND, "capture command")
                 transcript = self.asr.listen_utterance(stop_flag=lambda: not self._voice_running)
                 if not transcript:
+                    self.voice_fsm.transition(VoiceState.IDLE, "no utterance")
                     continue
 
                 transcript = transcript.strip()
+
+                # Discard commands captured before a STOP invalidated this session.
+                if self.voice_fsm.generation != gen_at_wake:
+                    logger.info("[VOICE] Discarding stale command captured before STOP.")
+                    continue
+
                 logger.info("[VOICE] Heard: %s", transcript)
-                self._set_voice_state("PROCESSING")
+                self.voice_fsm.transition(VoiceState.PROCESSING, "ASR complete")
                 event_broker.publish(EventType.VOICE_TRANSCRIPT, {"transcript": transcript})
-                self._set_voice_state("THINKING")
+
+                self.voice_fsm.transition(VoiceState.EXECUTING, "command bus dispatch")
                 result = self.handle_voice_command(transcript)
                 logger.info("[VOICE] Result: %s", result)
+
                 if self.tts.is_speaking():
-                    self._set_voice_state("SPEAKING")
+                    self.voice_fsm.transition(VoiceState.SPEAKING, "tts active")
+                elif self.voice_fsm.state != VoiceState.IDLE:
+                    self.voice_fsm.transition(VoiceState.IDLE, "session complete")
             except Exception as e:
                 logger.error("[VOICE] Listener error: %s", e)
                 event_broker.publish(EventType.ERROR, {"source": "voice", "message": str(e)})
+                self.voice_fsm.force(VoiceState.IDLE, "error recovery")
                 time.sleep(0.5)
 
         logger.info("[VOICE] Command listener stopped.")
+
+    def _publish_hazard_if_any(self, speech_cmd: Dict[str, Any], priority: int, source: str) -> None:
+        """Publishes a HAZARD envelope for the WebSocket event stream when applicable."""
+        event_key = str(speech_cmd.get("event_key", "") or "")
+        is_hazard = (
+            event_key.startswith("hazard")
+            or source == "DEPTH"
+            or priority in (PriorityLevel.EMERGENCY, PriorityLevel.CRITICAL_HAZARD, PriorityLevel.OBSTACLE)
+        )
+        if not is_hazard:
+            return
+        severity = "emergency" if priority <= PriorityLevel.EMERGENCY else "warning"
+        event_broker.publish(EventType.HAZARD, {
+            "text": speech_cmd.get("text", ""),
+            "priority": priority,
+            "severity": severity,
+            "event_key": event_key or None,
+            "source": source,
+        })
+
+    def _navigation_tick(self) -> Optional[Dict[str, Any]]:
+        """Publishes periodic navigation guidance while a route is active."""
+        if getattr(self.navigator, "state", "IDLE") != "GUIDING":
+            return None
+        loc = self.gps.get_location()
+        if loc.get("lat") is None or loc.get("lon") is None:
+            return None
+        update = self.navigator.update((loc.get("lat"), loc.get("lon")))
+        if update:
+            event_broker.publish(EventType.NAVIGATION_UPDATE, update)
+        return update
 
     def _draw_hud_annotations(self, frame: np.ndarray, world_state: WorldState):
         annotated = frame.copy()
@@ -430,6 +568,11 @@ class VisionMatePipeline:
                 "model": settings.OLLAMA_VLM_MODEL,
                 "status": "ON_DEMAND",
             },
+            "wake_word": self.wake_provider.health(),
+            "navigation": self.navigator.health(),
+            "voice_state_machine": self.voice_fsm.snapshot(),
+            "currency": {"status": "ON_DEMAND"},
+            "medicine": {"status": "ON_DEMAND"},
             "target_fps": settings.VISIONMATE_TARGET_FPS,
             "current_fps": self.current_fps,
         }
@@ -442,9 +585,12 @@ class VisionMatePipeline:
         self.find_handler.stop_find()
         self.world_state_mgr.set_find_target(None)
         self.world_state_mgr.set_mode(SystemMode.GUIDANCE)
+        self.navigator.stop()
+        # Invalidate any in-flight voice command and reset the voice FSM.
+        self.voice_fsm.abort(reason="STOP command")
         self.priority_engine.last_speech_time = time.time()
         event_broker.publish(EventType.MODE_CHANGED_PUBLIC, {"mode": "GUIDANCE"})
-        logger.info("[GLOBAL STOP] Speech purged, Find terminated, Guidance silent.")
+        logger.info("[GLOBAL STOP] Speech purged, Find/Navigation terminated, voice session invalidated.")
         return {
             "status": "STOPPED",
             "mode": "guidance",
@@ -509,6 +655,42 @@ class VisionMatePipeline:
         self.world_state_mgr.set_mode(SystemMode.GUIDANCE)
         return res
 
+    def _latest_frame(self):
+        frame = self.camera.get_latest_frame()
+        if frame is None:
+            frame = self.get_annotated_frame()
+        return frame
+
+    def trigger_currency(self) -> Dict[str, Any]:
+        """ON-DEMAND currency recognition. Never runs continuously."""
+        res = self.currency_recognizer.recognize(self._latest_frame())
+        self.tts.speak(res["text"], priority=PriorityLevel.INTERACTION, source="CURRENCY")
+        self.world_state_mgr.set_mode(SystemMode.GUIDANCE)
+        return res
+
+    def trigger_medicine(self) -> Dict[str, Any]:
+        """ON-DEMAND medicine/product label recognition. Never runs continuously."""
+        res = self.medicine_recognizer.recognize(self._latest_frame())
+        self.tts.speak(res["text"], priority=PriorityLevel.INTERACTION, source="MEDICINE")
+        self.world_state_mgr.set_mode(SystemMode.GUIDANCE)
+        return res
+
+    def start_navigation(self, destination: str) -> Dict[str, Any]:
+        loc = self.gps.get_location()
+        origin = (loc.get("lat"), loc.get("lon"))
+        res = self.navigator.start(destination, origin)
+        if res.get("text"):
+            self.tts.speak(res["text"], priority=PriorityLevel.NAVIGATION, source="NAVIGATION")
+        event_broker.publish(EventType.NAVIGATION_UPDATE, res)
+        return res
+
+    def stop_navigation(self) -> Dict[str, Any]:
+        self.navigator.stop()
+        text = "Navigation stopped."
+        self.tts.speak(text, priority=PriorityLevel.NAVIGATION, source="NAVIGATION")
+        event_broker.publish(EventType.NAVIGATION_UPDATE, {"status": "STOPPED", "text": text})
+        return {"status": "stopped", "mode": "navigation", "message": text}
+
     def stop(self):
         self._running = False
         self._voice_running = False
@@ -516,6 +698,10 @@ class VisionMatePipeline:
             self._perception_thread.join(timeout=1.5)
         if self._voice_thread and self._voice_thread.is_alive():
             self._voice_thread.join(timeout=1.5)
+        try:
+            self.wake_provider.stop()
+        except Exception:
+            pass
         self.camera.stop()
         self.tts.stop()
         logger.info("VisionMate pipeline stopped.")

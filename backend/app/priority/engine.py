@@ -6,6 +6,7 @@ Separates object detection from hazard arbitration and eliminates repetitive cha
 
 import time
 from typing import Optional, Dict, Any, Set, Tuple
+from backend.app.core.config import settings
 from backend.app.schemas.world_state import (
     WorldState,
     TrackedObject,
@@ -17,9 +18,27 @@ from backend.app.schemas.world_state import (
 )
 
 class PriorityLevel:
-    CRITICAL_HAZARD = 1   # Purge and preempt all ongoing audio immediately
-    NAVIGATION = 2        # High-priority directional updates
-    INTERACTION = 3       # Calm guidance and conversational responses
+    """
+    Speech/event priority hierarchy (lower int = spoken earlier / higher priority).
+
+    Conceptual mapping (PRD):
+      P0 critical emergency / immediate collision risk -> STOP / EMERGENCY
+      P1 immediate dangerous obstacle                  -> OBSTACLE
+      P2 navigation / directional guidance             -> NAVIGATION
+      P3 active user command                           -> USER_COMMAND
+      P4 awareness                                     -> AWARENESS / INTERACTION
+      P5 background information                        -> BACKGROUND
+    STOP is the absolute interruption command and outranks everything.
+    """
+    STOP = 0              # absolute interruption — purge all speech
+    EMERGENCY = 1         # P0 (alias: CRITICAL_HAZARD)
+    CRITICAL_HAZARD = 1   # P0 — kept for backward compatibility
+    OBSTACLE = 2          # P1 — immediate dangerous obstacle
+    NAVIGATION = 3        # P2 — directional guidance
+    USER_COMMAND = 4      # P3 — active user command responses
+    INTERACTION = 5       # P4 — awareness / conversational responses
+    AWARENESS = 5         # P4 alias
+    BACKGROUND = 6        # P5 — background information
 
 class PriorityEngine:
     """
@@ -122,6 +141,70 @@ class PriorityEngine:
                 }
 
         return None
+
+    def evaluate_depth_hazard(self, depth_zones: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        Physical proximity hazard from the ToF depth sensor (P4 integration).
+
+        Only fires when real depth hardware is connected and the center zone is
+        within the configured near threshold. The mock provider reports
+        connected=False, so laptop dev/testing is unaffected.
+        """
+        if not depth_zones or not depth_zones.get("connected"):
+            return None
+
+        center_mm = depth_zones.get("center_mm")
+        if center_mm is None:
+            return None
+
+        threshold = settings.TOF_CENTER_NEAR_THRESHOLD_MM
+        if center_mm >= threshold:
+            return None
+
+        now = time.time()
+        event_key = "hazard:depth:center"
+        entry = self._event_table.get(event_key)
+
+        severity = HazardSeverity.EMERGENCY if center_mm <= max(300, threshold // 2) else HazardSeverity.WARNING
+        dist_text = f"{center_mm / 1000.0:.1f} meters"
+        alert_text = (
+            f"Warning: obstacle very close ahead, about {dist_text}."
+            if severity == HazardSeverity.EMERGENCY
+            else f"Caution: obstacle ahead, about {dist_text}."
+        )
+
+        should_announce = False
+        if entry is None:
+            should_announce = True
+        else:
+            last_sev = entry.get("last_severity")
+            last_time = entry.get("announced_time", 0.0)
+            if severity == HazardSeverity.EMERGENCY and last_sev != HazardSeverity.EMERGENCY:
+                should_announce = True
+            elif (now - last_time) > self.hazard_cooldown:
+                should_announce = True
+
+        if not should_announce:
+            return None
+
+        self._event_table[event_key] = {
+            "state": EventLifecycleState.ANNOUNCED,
+            "first_seen": entry["first_seen"] if entry else now,
+            "announced_time": now,
+            "last_text": alert_text,
+            "last_severity": severity,
+            "last_direction": "center",
+            "last_motion": "",
+        }
+        self.last_speech_time = now
+
+        return {
+            "text": alert_text,
+            "priority": PriorityLevel.EMERGENCY if severity == HazardSeverity.EMERGENCY else PriorityLevel.OBSTACLE,
+            "interrupt": True if severity == HazardSeverity.EMERGENCY else False,
+            "event_key": event_key,
+            "source": "DEPTH",
+        }
 
     def should_speak_guidance(self, event_key: str, narrative: str) -> bool:
         """

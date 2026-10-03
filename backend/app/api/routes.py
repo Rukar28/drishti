@@ -40,6 +40,9 @@ class ReadRequest(BaseModel):
 class VoiceCommandRequest(BaseModel):
     transcript: str
 
+class NavigationRequest(BaseModel):
+    destination: str
+
 @router.get("/health")
 def get_health() -> Dict[str, Any]:
     """Returns system health, GPU presence, and granular subsystem states."""
@@ -202,6 +205,8 @@ def api_voice() -> Dict[str, Any]:
         "asr": pipeline.get_subsystems_health().get("asr", {}),
         "speaking": pipeline.tts.is_speaking(),
         "capture": "vad",
+        "wake_word": pipeline.wake_provider.health(),
+        "state_machine": pipeline.voice_fsm.snapshot(),
     }
 
 
@@ -239,4 +244,54 @@ def api_safety() -> Dict[str, Any]:
 @router.get("/api/location")
 def api_location() -> Dict[str, Any]:
     return pipeline.gps.get_location()
+
+
+# ── P5: on-demand currency / medicine ────────────────────────────
+@router.post("/api/v1/currency")
+def trigger_currency() -> Dict[str, Any]:
+    """ON-DEMAND currency recognition (never continuous)."""
+    return {"status": "SUCCESS", "result": pipeline.trigger_currency()}
+
+
+@router.post("/api/currency")
+def api_currency() -> Dict[str, Any]:
+    return trigger_currency()
+
+
+@router.post("/api/v1/medicine")
+def trigger_medicine() -> Dict[str, Any]:
+    """ON-DEMAND medicine/product label recognition (not medical advice)."""
+    return {"status": "SUCCESS", "result": pipeline.trigger_medicine()}
+
+
+@router.post("/api/medicine")
+def api_medicine() -> Dict[str, Any]:
+    return trigger_medicine()
+
+
+# ── P6: navigation ───────────────────────────────────────────────
+@router.get("/api/navigation")
+def api_navigation() -> Dict[str, Any]:
+    return pipeline.navigator.health()
+
+
+@router.post("/api/v1/navigation")
+def start_navigation(req: NavigationRequest) -> Dict[str, Any]:
+    res = pipeline.start_navigation(req.destination)
+    return {"status": "SUCCESS", "result": res}
+
+
+@router.post("/api/navigation")
+def api_navigation_start(req: NavigationRequest) -> Dict[str, Any]:
+    return start_navigation(req)
+
+
+@router.post("/api/v1/navigation/stop")
+def stop_navigation() -> Dict[str, Any]:
+    return pipeline.stop_navigation()
+
+
+@router.post("/api/navigation/stop")
+def api_navigation_stop() -> Dict[str, Any]:
+    return stop_navigation()
 

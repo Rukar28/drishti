@@ -58,6 +58,29 @@ class Settings(BaseSettings):
     OLLAMA_VLM_MODEL: str = "qwen3-vl:4b"
     VLM_TIMEOUT_SEC: float = 8.0
 
+    # Depth / ToF (VL53L5CX) — hardware is optional; laptop dev uses mock
+    # TOF_ENDPOINT_URL: JSON depth source exposed by the companion MCU/ESP32, e.g.
+    #   http://192.168.4.1/depth  -> {"zones": [[mm, ...8 cols], ...8 rows]}
+    TOF_ENDPOINT_URL: str = ""
+    TOF_TIMEOUT_SEC: float = 1.0
+    TOF_CENTER_NEAR_THRESHOLD_MM: int = 800   # center-zone proximity hazard threshold
+    TOF_VALID_MIN_MM: int = 20
+
+    # Currency & Medicine (ON-DEMAND only; never continuous)
+    CURRENCY_DEFAULT_REGION: str = "INR"  # INR | USD | EUR (affects denomination lexicon)
+
+    # GPS / Navigation — backend-side protected configuration (never exposed to frontend)
+    # NAVIGATION_PROVIDER: mock | google
+    NAVIGATION_PROVIDER: str = "mock"
+    NAVIGATION_ARRIVAL_RADIUS_M: float = 12.0
+    NAVIGATION_OFF_ROUTE_RADIUS_M: float = 35.0
+    # "name:lat,lon;name2:lat,lon" registry used by the mock provider (no live routing needed)
+    NAVIGATION_DESTINATIONS: str = (
+        "home:12.9716,77.5946;office:12.9352,77.6245;pharmacy:12.9600,77.6100"
+    )
+    # Google Directions key is ONLY read from the environment; never hard-code, never expose.
+    GOOGLE_MAPS_API_KEY: str = ""
+
     # Audio & TTS
     TTS_DEFAULT_RATE: int = 2  # SAPI voice rate (-10 to 10)
     TTS_VOLUME: int = 100
@@ -68,6 +91,21 @@ class Settings(BaseSettings):
     ASR_COMPUTE_TYPE: str = "int8"
     ASR_SAMPLE_RATE: int = 16000
     VOICE_LISTENER_ENABLED: bool = True
+
+    # Wake-word (LOCAL / OFFLINE keyword spotting — NOT VAD, NOT transcript matching)
+    # WAKE_WORD_MODE: auto | openwakeword | keyboard | disabled
+    #   auto         -> use local openWakeWord engine if importable, else DEVELOPMENT FALLBACK
+    #   openwakeword -> force local offline openWakeWord engine
+    #   keyboard     -> explicit DEVELOPMENT FALLBACK (Enter key / push-to-talk)
+    #   disabled     -> no gate; the session is always active (dev/competition convenience)
+    WAKE_WORD_ENABLED: bool = True
+    WAKE_WORD_MODE: str = "auto"
+    WAKE_WORD_PHRASE: str = "hey drishti"
+    WAKE_WORD_MODEL_PATH: str = ""  # optional custom openWakeWord model (.onnx)
+    WAKE_WORD_PRETRAINED: str = "alexa"  # pretrained listen target when no custom model
+    WAKE_WORD_THRESHOLD: float = 0.5
+    WAKE_WORD_ACK_TEXT: str = ""  # optional short spoken acknowledgement on wake
+
     VAD_FRAME_MS: int = 30
     VAD_SPEECH_START_RMS: float = 0.018
     VAD_SPEECH_END_RMS: float = 0.010

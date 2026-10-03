@@ -1,0 +1,1 @@
+"""VisionMate navigation package (GPS → destination → route → voice guidance)."""
