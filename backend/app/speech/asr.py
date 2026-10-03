@@ -222,7 +222,30 @@ class LocalASRProvider(ASRProvider):
         if re.search(r"\b(who is this|do i know this person)\b", q_clean):
             return {"intent": "FACE", "raw_text": raw, "confidence": 0.9}
 
-        if re.search(r"\b(emergency|help me|call my caregiver)\b", q_clean):
+        # SOS patterns - check specific emergency phrases first
+        if re.search(r"\bsos\b", q_clean):
+            return {"intent": "SOS", "raw_text": raw, "confidence": 0.95}
+
+        if re.search(r"\bemergency\b", q_clean):
+            return {"intent": "SOS", "raw_text": raw, "confidence": 0.95}
+
+        if re.search(r"\bi need help\b", q_clean):
+            return {"intent": "SOS", "raw_text": raw, "confidence": 0.95}
+
+        if re.search(r"\bsend help\b", q_clean):
+            return {"intent": "SOS", "raw_text": raw, "confidence": 0.95}
+
+        if re.search(r"\bcall for help\b", q_clean):
+            return {"intent": "SOS", "raw_text": raw, "confidence": 0.95}
+
+        if re.search(r"\bemergency help\b", q_clean):
+            return {"intent": "SOS", "raw_text": raw, "confidence": 0.95}
+
+        # "help me" only triggers SOS if not followed by contextual words like "find"
+        if re.search(r"\bhelp me\b", q_clean) and not re.search(r"\b(help me).*(find|locate|search)\b", q_clean):
+            return {"intent": "SOS", "raw_text": raw, "confidence": 0.95}
+
+        if re.search(r"\bcall my caregiver\b", q_clean):
             return {"intent": "SOS", "raw_text": raw, "confidence": 0.95}
 
         if re.search(r"\b(navigate to|take me to|go home|start navigation|stop navigation|where am i)\b", q_clean):

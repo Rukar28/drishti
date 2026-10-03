@@ -86,6 +86,6 @@ def test_pipeline_registers_real_handlers_not_stub():
     assert pipe.command_bus._handlers["CURRENCY"].__name__ == "_cmd_currency"
     assert pipe.command_bus._handlers["MEDICINE"].__name__ == "_cmd_medicine"
     assert pipe.command_bus._handlers["NAVIGATION"].__name__ == "_cmd_navigation"
+    assert pipe.command_bus._handlers["SOS"].__name__ == "_cmd_sos"
     # Deferred features remain explicitly unavailable.
     assert pipe.command_bus._handlers["FACE"].__name__ == "_cmd_not_available"
-    assert pipe.command_bus._handlers["SOS"].__name__ == "_cmd_not_available"

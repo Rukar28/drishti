@@ -161,6 +161,10 @@ from backend.app.navigation.navigator import (
     Navigator,
 )
 
+from backend.app.services.sos import (
+    sos_service,
+)
+
 from backend.app.schemas.world_state import (
     SystemMode,
     WorldState,
@@ -478,7 +482,7 @@ class VisionMatePipeline:
 
         self.command_bus.register(
             "SOS",
-            self._cmd_not_available,
+            self._cmd_sos,
         )
 
     # =========================================================================
@@ -716,6 +720,53 @@ class VisionMatePipeline:
         return {
             "status": "needs_destination",
             "mode": "navigation",
+            "message": text,
+        }
+
+    def _cmd_sos(
+        self,
+        parsed: Dict[str, Any],
+    ) -> Dict[str, Any]:
+
+        result = sos_service.send_emergency_alert()
+
+        if result["success"]:
+            text = "Emergency alert sent."
+            event_broker.publish(
+                EventType.SOS_ALERT,
+                {
+                    "status": "sent",
+                    "timestamp": result.get("timestamp"),
+                },
+            )
+        else:
+            status = result.get("status", "failed")
+            if status == "not_configured":
+                text = "Emergency notifications are not configured."
+            elif status == "cooldown":
+                text = "Emergency alert already sent recently."
+            else:
+                text = "I couldn't send the emergency alert."
+
+            event_broker.publish(
+                EventType.SOS_ALERT,
+                {
+                    "status": status,
+                    "error": result.get("error"),
+                },
+            )
+
+        self.tts.speak(
+            text,
+            priority=PriorityLevel.EMERGENCY,
+            interrupt=True,
+            source="SOS",
+        )
+
+        return {
+            "status": result.get("status", "failed"),
+            "mode": "sos",
+            "success": result.get("success", False),
             "message": text,
         }
 

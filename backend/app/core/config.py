@@ -334,6 +334,26 @@ class Settings(BaseSettings):
 
     VAD_PRE_ROLL_MS: int = 240
 
+    # =========================================================================
+    # SOS / EMERGENCY NOTIFICATIONS
+    # =========================================================================
+
+    SOS_ENABLED: bool = False
+
+    SOS_COOLDOWN_SEC: float = 60.0
+
+    SOS_RECIPIENT: str = ""
+
+    SOS_SMTP_HOST: str = ""
+
+    SOS_SMTP_PORT: int = 587
+
+    SOS_SMTP_USERNAME: str = ""
+
+    SOS_SMTP_PASSWORD: str = ""
+
+    SOS_FROM_EMAIL: str = ""
+
 
 # ============================================================================
 # GLOBAL SETTINGS INSTANCE
