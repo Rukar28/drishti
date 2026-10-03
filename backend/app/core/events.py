@@ -12,6 +12,7 @@ import logging
 
 logger = logging.getLogger("visionmate.events")
 
+
 class EventType:
     FRAME_RECEIVED = "camera.frame_received"
     DETECTIONS_UPDATED = "perception.detections"
@@ -22,6 +23,8 @@ class EventType:
     FIND_TARGET_UPDATED = "find.target_updated"
     OCR_RESULT_READY = "ocr.result_ready"
     VLM_RESULT_READY = "vlm.result_ready"
+    COLOR_RESULT_READY = "color.result_ready"
+
     # Public WebSocket envelope types (PRD)
     WORLD_UPDATE = "WORLD_UPDATE"
     DETECTION = "DETECTION"
@@ -48,6 +51,7 @@ class Event:
 
 class EventBus:
     """Thread-safe and async-compatible publish/subscribe event bus."""
+
     def __init__(self):
         self._subscribers: Dict[str, List[Callable[[Event], Any]]] = {}
 
@@ -71,6 +75,7 @@ class EventBus:
                     handler(event)
             except Exception as e:
                 logger.error(f"Error executing event handler for {event_type}: {e}")
+
 
 # Global event bus singleton
 event_bus = EventBus()

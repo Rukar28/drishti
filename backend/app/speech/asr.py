@@ -194,8 +194,24 @@ class LocalASRProvider(ASRProvider):
                     "confidence": 0.95,
                 }
 
-        if re.search(r"\bwhat(?:s| is)? (?:the )?color\b", q_clean) or "what color" in q_clean:
-            return {"intent": "COLOR", "raw_text": raw, "confidence": 0.9}
+        color_m = (
+            re.search(r"\bwhat(?:'s|s| is)? (?:the )?colou?r\b(.*)$", q_clean)
+            or re.search(
+                r"\b(?:which|tell me the|show me the) colou?r\b(?:\s+of\b)?(.*)$",
+                q_clean,
+            )
+        )
+        if color_m or "what color" in q_clean:
+            tail = (color_m.group(1) if color_m else "") or ""
+            tail = re.sub(r"^(?:\s+is|\s+of|\s+are)\b", "", tail)
+            tail = re.sub(r"^(?:\s+(?:the|my|this|that|a|an|it))+\b", "", tail)
+            tail = re.sub(r"\b(please|now|exactly)\b$", "", tail).strip()
+            return {
+                "intent": "COLOR",
+                "target": tail or None,
+                "raw_text": raw,
+                "confidence": 0.9,
+            }
 
         if "medicine" in q_clean or "pill" in q_clean:
             return {"intent": "MEDICINE", "raw_text": raw, "confidence": 0.9}
