@@ -20,6 +20,14 @@ npm run dev
 
 Open http://127.0.0.1:3000 and choose **VisionMate User** or **Caregiver**. The Vite proxy carries REST and WebSocket traffic to FastAPI. `frontend/.env.example` documents custom backend origins. No backend credentials belong in frontend environment variables.
 
+For an explicit webcam/browser GPS development profile, the launcher can run both servers:
+
+```powershell
+.\scripts\start-dev.ps1 -Camera webcam -GPS browser -BackendPort 8010
+```
+
+This preserves the root `.env`. Stop the previous frontend first so port 3000 is free. The launcher accepts `-FrontendPort` too and restores shell environment variables on exit. The current local test session uses backend **8010**, with the Git-ignored `frontend/.env.local` proxy override; remove that local override or set its port appropriately when returning to backend 8000.
+
 ## Configuration
 
 The root `.env` controls the backend. It is ignored by Git.
@@ -40,6 +48,7 @@ Role selection is **not authentication**. This prototype has no account/session 
 cd frontend
 npm run build
 npm run lint
+npm test
 ```
 
 The prior untracked, incomplete frontend draft is preserved locally in the Git-ignored `frontend/legacy-draft/` folder. Active code is in `frontend/src/app/`, with independent screens, shared components, typed API calls, one event connection/store, and a separate frame stream.

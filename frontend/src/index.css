@@ -543,3 +543,10 @@ footer svg {
     animation: none !important;
   }
 }
+progress {
+  display: block;
+  width: 100%;
+  height: 12px;
+  accent-color: #35a9c8;
+  margin: 10px 0;
+}

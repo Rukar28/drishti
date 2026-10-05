@@ -55,10 +55,11 @@ export const api = {
   navigation: () => request<NavigationState>("/api/navigation"),
   sos: () => request<SOSState>("/api/sos"),
   action: (path: string, body = {}) => request<ActionResult>(path, body),
-  locationUpdate: (coords: GeolocationCoordinates) =>
+  locationUpdate: (coords: GeolocationCoordinates, timestamp?: number) =>
     request<LocationState>("/api/location", {
       lat: coords.latitude,
       lon: coords.longitude,
       accuracy: coords.accuracy,
+      timestamp: timestamp == null ? undefined : timestamp / 1000,
     }),
 };

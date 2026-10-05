@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { startRealtime } from "./realtime";
+import { stopLocationSharing } from "./locationSharing";
 import { DeviceStatus } from "./components";
 import Entry from "./pages/Entry";
 import Layout from "./pages/Layout";
@@ -17,7 +18,11 @@ export default function App() {
       "large-text",
       localStorage.getItem("vm-large") === "true",
     );
-    return startRealtime();
+    const stopRealtime = startRealtime();
+    return () => {
+      stopRealtime();
+      stopLocationSharing();
+    };
   }, []);
   return (
     <Routes>

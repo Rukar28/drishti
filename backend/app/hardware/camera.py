@@ -39,6 +39,9 @@ class DirectShowWebcam(CameraProvider):
         self._thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
         self._is_connected = False
+        self._last_frame_timestamp = 0.0
+        self._received_frames = 0
+        self._fps_started = time.time()
 
     def start(self) -> bool:
         if self._running:
@@ -57,7 +60,10 @@ class DirectShowWebcam(CameraProvider):
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         self._running = True
-        self._is_connected = True
+        self._is_connected = False
+        self._received_frames = 0
+        self._last_frame_timestamp = 0.0
+        self._fps_started = time.time()
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._thread.start()
         return True
@@ -69,6 +75,8 @@ class DirectShowWebcam(CameraProvider):
                 if ret and frame is not None:
                     with self._lock:
                         self._latest_frame = frame
+                        self._last_frame_timestamp = time.time()
+                        self._received_frames += 1
                     self._is_connected = True
                 else:
                     self._is_connected = False
@@ -79,12 +87,12 @@ class DirectShowWebcam(CameraProvider):
 
     def get_latest_frame(self) -> Optional[np.ndarray]:
         with self._lock:
-            if self._latest_frame is not None:
+            if self._latest_frame is not None and self.is_connected():
                 return self._latest_frame.copy()
             return None
 
     def is_connected(self) -> bool:
-        return self._is_connected
+        return self._is_connected and time.time() - self._last_frame_timestamp < 2.0
 
     def get_resolution(self) -> Tuple[int, int]:
         return (self.target_width, self.target_height)
@@ -101,8 +109,13 @@ class DirectShowWebcam(CameraProvider):
     def get_diagnostics(self) -> Dict[str, Any]:
         return {
             "source": "webcam",
-            "connected": self._is_connected,
-            "connection_state": "ONLINE" if self._is_connected else "OFFLINE",
+            "connected": self.is_connected(),
+            "frame_width": self._latest_frame.shape[1] if self._latest_frame is not None else 0,
+            "frame_height": self._latest_frame.shape[0] if self._latest_frame is not None else 0,
+            "last_frame_timestamp": self._last_frame_timestamp,
+            "frame_age_ms": (time.time()-self._last_frame_timestamp)*1000 if self._last_frame_timestamp else None,
+            "camera_received_fps": self._received_frames / max(1, time.time()-self._fps_started),
+            "connection_state": "ONLINE" if self.is_connected() else "OFFLINE",
         }
 
 

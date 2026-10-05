@@ -97,14 +97,6 @@ class PPOCRv5Provider(OCRProvider):
         is_valid = bool(image.size > 0 and np.max(image) > 0)
         logger.info(f"[OCR-DEBUG] 5. Frame contains valid image: {'YES' if is_valid else 'NO'} (pixel range: {int(np.min(image))}..{int(np.max(image))})")
 
-        # Save debug frame for manual inspection
-        try:
-            os.makedirs("logs", exist_ok=True)
-            cv2.imwrite("logs/debug_read_frame.jpg", image)
-            logger.info("[OCR-DEBUG] Saved raw frame to logs/debug_read_frame.jpg")
-        except Exception as e:
-            logger.warning(f"[OCR-DEBUG] Failed to save debug frame: {e}")
-
         # 1. Preprocess
         t_prep_start = time.perf_counter()
         enhanced_img, sharpness = self._preprocess_image(image)
@@ -172,6 +164,7 @@ class PPOCRv5Provider(OCRProvider):
             return {
                 "full_text": "",
                 "short_summary": msg,
+                "status": "UNAVAILABLE" if self.ocr_engine is None else "NO_TEXT",
                 "text_blocks": [],
                 "has_text": False,
                 "model_name": self.model_name,

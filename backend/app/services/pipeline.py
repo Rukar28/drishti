@@ -369,6 +369,9 @@ class VisionMatePipeline:
         # =====================================================================
 
         self._running = False
+        self._navigation_thread = None
+        self._navigation_stop = threading.Event()
+        self._navigation_lock = threading.Lock()
 
         self._perception_thread: Optional[
             threading.Thread
@@ -901,6 +904,9 @@ class VisionMatePipeline:
         )
 
         self._perception_thread.start()
+        self._navigation_stop.clear()
+        self._navigation_thread = threading.Thread(target=self._navigation_loop, daemon=True, name="VisionMateNavigation")
+        self._navigation_thread.start()
 
         # ---------------------------------------------------------------------
         # Voice worker
@@ -1273,27 +1279,6 @@ class VisionMatePipeline:
                         speech_cmd,
                         pri,
                         src,
-                    )
-
-                # -------------------------------------------------------------
-                # NAVIGATION
-                # -------------------------------------------------------------
-
-                nav_update = (
-                    self._navigation_tick()
-                )
-
-                if (
-                    nav_update
-                    and nav_update.get("text")
-                ):
-
-                    self.tts.speak(
-                        nav_update["text"],
-                        priority=(
-                            PriorityLevel.NAVIGATION
-                        ),
-                        source="NAVIGATION",
                     )
 
                 # -------------------------------------------------------------
@@ -1717,55 +1702,29 @@ class VisionMatePipeline:
     # NAVIGATION
     # =========================================================================
 
-    def _navigation_tick(
-        self,
-    ) -> Optional[Dict[str, Any]]:
+    def _navigation_loop(self):
+        """Existing navigator gets its own clock, independent of camera availability."""
+        while not self._navigation_stop.wait(1.0):
+            try:
+                self._navigation_tick()
+            except Exception:
+                logger.exception("Navigation update failed")
 
-        """
-        Publish periodic navigation guidance
-        while a route is active.
-        """
-
-        if (
-            getattr(
-                self.navigator,
-                "state",
-                "IDLE",
-            )
-            != "GUIDING"
-        ):
-
+    def _navigation_tick(self) -> Optional[Dict[str, Any]]:
+        if not self._navigation_lock.acquire(blocking=False):
             return None
-
-        loc = (
-            self.gps.get_location()
-        )
-
-        if (
-            loc.get("lat") is None
-            or
-            loc.get("lon") is None
-        ):
-
-            return None
-
-        update = (
-            self.navigator.update(
-                (
-                    loc.get("lat"),
-                    loc.get("lon"),
-                )
-            )
-        )
-
-        if update:
-
-            event_broker.publish(
-                EventType.NAVIGATION_UPDATE,
-                update,
-            )
-
-        return update
+        try:
+            speech_generation = self.tts.speech_generation
+            loc = self.gps.get_location()
+            update = self.navigator.update((loc.get("lat"), loc.get("lon")))
+            if update:
+                event_broker.publish(EventType.NAVIGATION_UPDATE, update)
+                if update.get("speak") and update.get("text"):
+                    self.tts.speak(update["text"], priority=PriorityLevel.NAVIGATION,
+                                   source="NAVIGATION", generation_id=speech_generation)
+            return update
+        finally:
+            self._navigation_lock.release()
 
     # =========================================================================
     # HUD
@@ -2503,6 +2462,7 @@ class VisionMatePipeline:
         full_reading: bool = False,
     ) -> Dict[str, Any]:
 
+        generation = self.tts.speech_generation
         t0 = time.perf_counter()
 
         frame = (
@@ -2541,12 +2501,16 @@ class VisionMatePipeline:
                 2,
             )
 
+        if generation != self.tts.speech_generation:
+            return {"status": "CANCELLED", "success": False, "text": "Request cancelled."}
+
         self.tts.speak(
             res["text"],
             priority=(
                 PriorityLevel.INTERACTION
             ),
             source="READ",
+            generation_id=generation,
         )
 
         self.world_state_mgr.set_mode(
@@ -2564,6 +2528,7 @@ class VisionMatePipeline:
         user_query: str,
     ) -> Dict[str, Any]:
 
+        generation = self.tts.speech_generation
         frame = (
             self.camera.get_latest_frame()
         )
@@ -2575,12 +2540,16 @@ class VisionMatePipeline:
             )
         )
 
+        if generation != self.tts.speech_generation:
+            return {"status": "CANCELLED", "success": False, "text": "Request cancelled."}
+
         self.tts.speak(
             res["text"],
             priority=(
                 PriorityLevel.INTERACTION
             ),
             source="ASK",
+            generation_id=generation,
         )
 
         self.world_state_mgr.set_mode(
@@ -2614,6 +2583,7 @@ class VisionMatePipeline:
 
         """Run on-demand local color recognition without touching the 18 FPS loop."""
 
+        generation = self.tts.speech_generation
         frame = self.camera.get_latest_frame()
 
         track_summaries: List[Dict[str, Any]] = []
@@ -2644,6 +2614,9 @@ class VisionMatePipeline:
             tracks=track_summaries,
         )
 
+        if generation != self.tts.speech_generation:
+            return {"status": "CANCELLED", "success": False, "text": "Request cancelled."}
+
         text = result.get("text", "")
 
         if text:
@@ -2652,6 +2625,7 @@ class VisionMatePipeline:
                 text,
                 priority=PriorityLevel.INTERACTION,
                 source="COLOR",
+            generation_id=generation,
             )
 
             try:
@@ -2691,11 +2665,15 @@ class VisionMatePipeline:
         Never runs continuously.
         """
 
+        generation = self.tts.speech_generation
         res = (
             self.currency_recognizer.recognize(
                 self._latest_frame()
             )
         )
+
+        if generation != self.tts.speech_generation:
+            return {"status": "CANCELLED", "success": False, "text": "Request cancelled."}
 
         self.tts.speak(
             res["text"],
@@ -2703,6 +2681,7 @@ class VisionMatePipeline:
                 PriorityLevel.INTERACTION
             ),
             source="CURRENCY",
+            generation_id=generation,
         )
 
         self.world_state_mgr.set_mode(
@@ -2725,11 +2704,15 @@ class VisionMatePipeline:
         Never runs continuously.
         """
 
+        generation = self.tts.speech_generation
         res = (
             self.medicine_recognizer.recognize(
                 self._latest_frame()
             )
         )
+
+        if generation != self.tts.speech_generation:
+            return {"status": "CANCELLED", "success": False, "text": "Request cancelled."}
 
         self.tts.speak(
             res["text"],
@@ -2737,6 +2720,7 @@ class VisionMatePipeline:
                 PriorityLevel.INTERACTION
             ),
             source="MEDICINE",
+            generation_id=generation,
         )
 
         self.world_state_mgr.set_mode(
@@ -2763,6 +2747,7 @@ class VisionMatePipeline:
             loc.get("lon"),
         )
 
+        speech_generation = self.tts.speech_generation
         res = (
             self.navigator.start(
                 destination,
@@ -2770,7 +2755,7 @@ class VisionMatePipeline:
             )
         )
 
-        if res.get("text"):
+        if res.get("text") and res.get("status") != "CANCELLED":
 
             self.tts.speak(
                 res["text"],
@@ -2778,6 +2763,7 @@ class VisionMatePipeline:
                     PriorityLevel.NAVIGATION
                 ),
                 source="NAVIGATION",
+                generation_id=speech_generation,
             )
 
         event_broker.publish(
@@ -2792,6 +2778,7 @@ class VisionMatePipeline:
     ) -> Dict[str, Any]:
 
         self.navigator.stop()
+        self.tts.stop()
 
         text = (
             "Navigation stopped."
@@ -2809,6 +2796,7 @@ class VisionMatePipeline:
             EventType.NAVIGATION_UPDATE,
             {
                 "status": "STOPPED",
+                "navigation": self.navigator.health(),
                 "text": text,
             },
         )
@@ -2825,6 +2813,10 @@ class VisionMatePipeline:
 
     def stop(self):
 
+        self._navigation_stop.set()
+        self.navigator.stop()
+        if self._navigation_thread and self._navigation_thread.is_alive():
+            self._navigation_thread.join(timeout=1.5)
         self._running = False
 
         self._voice_running = False

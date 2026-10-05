@@ -135,3 +135,172 @@ def test_no_standby_frame_used_for_assistance(monkeypatch):
     assert pipe._latest_frame() is None
     assert pipe.trigger_ask('What is in view?')['success'] is False
     assert pipe.trigger_read()['has_text'] is False
+
+def encode_test_polyline(points):
+    output=[]; previous=(0,0)
+    for lat,lon in points:
+        point=(round(lat*1e5),round(lon*1e5))
+        for value,old in zip(point,previous):
+            delta=value-old
+            encoded=~(delta<<1) if delta<0 else delta<<1
+            while encoded>=32:
+                output.append(chr((32|(encoded&31))+63));encoded>>=5
+            output.append(chr(encoded+63))
+        previous=point
+    return ''.join(output)
+
+
+def google_fixture_provider():
+    """Explicit test fixture only; never used by application factories."""
+    from backend.app.navigation.navigator import MockNavigationProvider
+    class Provider(MockNavigationProvider):
+        name='google'
+        calls=0
+        def get_route(self,origin,destination):
+            self.calls+=1
+            return {'status':'OK','provider':'google','distance_m':222,'duration_s':160,
+                    'polyline':encode_test_polyline([(12,77),(12.001,77),(12.002,77)]),
+                    'instruction':'Head north', 'steps':[
+                    {'instruction':'Head north','maneuver':'DEPART','distance_m':111,'end':{'latitude':12.001,'longitude':77}},
+                    {'instruction':'Continue toward station','maneuver':'STRAIGHT','distance_m':111,'end':{'latitude':12.002,'longitude':77}}]}
+    return Provider({'station':(12.002,77)})
+
+
+def test_google_progress_steps_and_no_repeated_routes():
+    provider=google_fixture_provider();nav=Navigator(provider)
+    nav.start('station',(12,77))
+    nav.last_update=0
+    result=nav.update((12.0005,77))
+    h=nav.health()
+    assert 0.24<h['progress']<0.26
+    assert 165<h['remaining_distance_m']<168
+    assert h['remaining_duration_s']==120
+    assert 54<h['distance_to_maneuver_m']<57
+    assert h['next_maneuver']=='STRAIGHT'
+    assert result['speak'] is False
+    nav.last_update=0
+    result=nav.update((12.0012,77))
+    assert nav.step_index==1
+    assert result['speak'] is True
+    nav.last_update=0
+    assert nav.update((12.0013,77))['speak'] is False
+    assert provider.calls==1
+    nav.last_update=0
+    assert nav.update((12.002,77))['status']=='ARRIVED'
+    assert nav.health()['remaining_distance_m']==0
+    assert nav.health()['progress']==1
+
+
+def test_navigation_pauses_and_resumes_on_gps_loss():
+    nav=Navigator(google_fixture_provider());nav.start('station',(12,77))
+    assert nav.update((None,None))['status']=='GPS_UNAVAILABLE'
+    assert nav.state=='PAUSED_GPS'
+    assert nav.health()['instruction'] is None
+    assert nav.update((None,None)) is None
+    result=nav.update((12.0005,77))
+    assert result['status']=='GUIDING'
+    assert result['speak'] is True
+
+
+def test_offroute_reroutes_once_and_stop_cancels():
+    provider=google_fixture_provider();nav=Navigator(provider)
+    nav.start('station',(12,77));nav.last_update=0
+    assert nav.update((12.0005,77.002))['status']=='REROUTED'
+    assert provider.calls==2
+    nav.last_update=0
+    assert nav.update((12.0005,77.002))['status']=='OFF_ROUTE'
+    assert provider.calls==2  # persistent off-route fixes do not flood Google
+    nav.last_update=0
+    assert nav.update((12.0005,77.002))['speak'] is False
+    nav.last_reroute=0;nav.last_update=0
+    assert nav.update((12.0005,77.002))['status']=='REROUTED'
+    assert provider.calls==3
+    nav.stop()
+    assert nav.update((12.001,77)) is None
+
+
+def test_navigation_tick_speaks_only_new_instruction(monkeypatch):
+    from backend.app.services.pipeline import VisionMatePipeline
+    from unittest.mock import Mock
+    pipe=VisionMatePipeline(camera_source='mock')
+    pipe.navigator=Navigator(google_fixture_provider())
+    gps=BrowserGPSProvider();pipe.gps=gps
+    gps.update(12,77,3)
+    pipe.navigator.start('station',(12,77))
+    pipe.tts=Mock(speech_generation=7)
+    pipe.navigator.last_update=0;gps.update(12.0005,77,3)
+    pipe._navigation_tick()
+    pipe.tts.speak.assert_not_called()
+    pipe.navigator.last_update=0;gps.update(12.0012,77,3)
+    pipe._navigation_tick()
+    assert pipe.tts.speak.call_count==1
+    assert pipe.tts.speak.call_args.kwargs['generation_id']==7
+    pipe.navigator.last_update=0;pipe._navigation_tick()
+    assert pipe.tts.speak.call_count==1
+    pipe.stop_navigation()
+    pipe.tts.stop.assert_called_once()
+
+def test_stale_location_upload_is_rejected(monkeypatch):
+    monkeypatch.setattr(routes.pipeline,'gps',BrowserGPSProvider())
+    result=TestClient(app).post('/api/location',json={'lat':12,'lon':77,'accuracy':5,'timestamp':time.time()-60})
+    assert result.status_code==422
+    assert routes.pipeline.gps.get_location()['lat'] is None
+
+
+def test_location_route_progress_event_and_tts_chain(monkeypatch):
+    """Full local chain with explicitly controlled upstream route/GPS fixtures."""
+    from unittest.mock import Mock
+    nav=Navigator(google_fixture_provider());gps=BrowserGPSProvider()
+    monkeypatch.setattr(routes.pipeline,'navigator',nav)
+    monkeypatch.setattr(routes.pipeline,'gps',gps)
+    tts=Mock(speech_generation=9)
+    monkeypatch.setattr(routes.pipeline,'tts',tts)
+    client=TestClient(app)
+    with client.websocket_connect('/ws/events') as ws:
+        assert ws.receive_json()['type']=='SYSTEM_STATUS'
+        assert client.post('/api/location',json={'lat':12,'lon':77,'accuracy':3}).status_code==200
+        result=client.post('/api/navigation',json={'destination':'station'}).json()
+        assert result['result']['status']=='STARTED'
+        nav.last_update=0
+        client.post('/api/location',json={'lat':12.0012,'lon':77,'accuracy':3})
+        routes.pipeline._navigation_tick()
+        received=None
+        for _ in range(20):
+            event=ws.receive_json()
+            if event['type']=='NAVIGATION_UPDATE' and event['data'].get('status')=='GUIDING':
+                received=event['data'];break
+        assert received is not None
+        assert 0.59<received['navigation']['progress']<0.61
+        assert received['navigation']['step_index']==1
+        assert tts.speak.call_count==2  # start + newly reached maneuver
+        stopped=client.post('/api/navigation/stop').json()
+        assert stopped['status']=='stopped'
+        assert nav.state=='CANCELLED'
+
+def test_slow_ask_cannot_speak_after_stop(monkeypatch):
+    from backend.app.services.pipeline import VisionMatePipeline
+    from unittest.mock import Mock
+    pipe=VisionMatePipeline(camera_source='mock')
+    pipe.tts=Mock(speech_generation=1)
+    monkeypatch.setattr(pipe.camera,'get_latest_frame',lambda:np.zeros((10,10,3),dtype=np.uint8))
+    def slow_result(*args):
+        pipe.tts.speech_generation=2
+        return {'text':'A delayed response','success':True}
+    monkeypatch.setattr(pipe.ask_handler,'ask',slow_result)
+    result=pipe.trigger_ask('What is here?')
+    assert result['status']=='CANCELLED'
+    pipe.tts.speak.assert_not_called()
+
+
+def test_webcam_does_not_return_disconnected_cached_frame():
+    from backend.app.hardware.camera import DirectShowWebcam
+    camera=DirectShowWebcam()
+    camera._latest_frame=np.zeros((10,10,3),dtype=np.uint8)
+    camera._last_frame_timestamp=time.time()
+    camera._is_connected=False
+    assert camera.get_latest_frame() is None
+    camera._is_connected=True
+    assert camera.get_latest_frame() is not None
+    camera._last_frame_timestamp=time.time()-3
+    assert camera.is_connected() is False
+    assert camera.get_latest_frame() is None

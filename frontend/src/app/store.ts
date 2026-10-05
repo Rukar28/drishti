@@ -9,6 +9,8 @@ import type {
   Envelope,
 } from "./types";
 interface State {
+  locationSharing: boolean;
+  locationError: string;
   assistant: string;
   online: boolean;
   connection: string;
@@ -26,6 +28,8 @@ interface State {
   event: (e: Envelope) => void;
 }
 export const useApp = create<State>((set) => ({
+  locationSharing: false,
+  locationError: "",
   assistant: "",
   online: false,
   connection: "Connecting",

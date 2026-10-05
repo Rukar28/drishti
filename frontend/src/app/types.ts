@@ -31,6 +31,14 @@ export interface NavigationState {
   instruction?: string;
   last_update?: number;
   step_index?: number;
+  location_available?: boolean;
+  progress?: number | null;
+  remaining_distance_m?: number | null;
+  remaining_duration_s?: number | null;
+  distance_to_maneuver_m?: number | null;
+  maneuver?: string | null;
+  next_instruction?: string | null;
+  next_maneuver?: string | null;
   route?: RouteState;
   error?: string;
 }

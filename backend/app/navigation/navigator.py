@@ -190,6 +190,8 @@ class GoogleDirectionsProvider(NavigationProvider):
             route = routes[0]
             steps = [{"instruction": step.get("navigationInstruction", {}).get("instructions", "Continue"),
                       "distance_m": step.get("distanceMeters"),
+                      "duration_s": float(step["staticDuration"].rstrip("s")) if step.get("staticDuration") else None,
+                      "maneuver": step.get("navigationInstruction", {}).get("maneuver"),
                       "end": step.get("endLocation", {}).get("latLng"),
                       "polyline": step.get("polyline", {}).get("encodedPolyline")}
                      for leg in route.get("legs", []) for step in leg.get("steps", [])]
@@ -227,18 +229,32 @@ class Navigator:
         self.destination_coords: Optional[Tuple[float, float]] = None
         self.last_instruction: Optional[str] = None
         self.last_update: float = 0.0
+        self.last_reroute: float = 0.0
         self.state: str = "IDLE"
         self.route = {}
         self.step_index = 0
+        self.progress = None
+        self.remaining_distance_m = None
+        self.remaining_duration_s = None
+        self.distance_to_maneuver_m = None
+        self.maneuver = None
+        self.location_available = False
         self._generation = getattr(self, "_generation", 0) + 1
 
     def stop(self) -> None:
+        self.last_reroute = 0.0
         self.destination_name = None
         self.destination_coords = None
         self.last_instruction = None
         self.state = "CANCELLED"
         self.route = {}
         self.step_index = 0
+        self.progress = None
+        self.remaining_distance_m = None
+        self.remaining_duration_s = None
+        self.distance_to_maneuver_m = None
+        self.maneuver = None
+        self.location_available = False
         self._generation = getattr(self, "_generation", 0) + 1
 
     def start(self, destination_name: str, origin: Optional[Tuple[float, float]]) -> Dict[str, Any]:
@@ -279,6 +295,8 @@ class Navigator:
         self.state = "GUIDING"
         self.last_instruction = route.get("instruction")
         self.last_update = time.time()
+        self.location_available = True
+        self._update_progress(origin)
         return {
             "status": "STARTED",
             "text": f"Starting navigation to {name}. {self.last_instruction or ''}".strip(),
@@ -286,63 +304,109 @@ class Navigator:
             "navigation": self.health(),
         }
 
-    def update(self, origin: Optional[Tuple[float, float]], min_interval_sec: float = 8.0) -> Optional[Dict[str, Any]]:
-        if self.state != "GUIDING" or self.destination_coords is None:
+    def _update_progress(self, origin):
+        """Project a measured GPS fix onto provider geometry; estimates are labelled."""
+        points = decode_polyline(self.route.get("polyline") or "")
+        if len(points) < 2:
+            return
+        _, along, total = project_on_route(origin, points)
+        if total <= 0:
+            return
+        fraction = max(0.0, min(1.0, along / total))
+        self.progress = round(fraction, 4)
+        distance = self.route.get("distance_m")
+        duration = self.route.get("duration_s")
+        self.remaining_distance_m = round(distance * (1-fraction), 1) if distance is not None else None
+        self.remaining_duration_s = round(duration * (1-fraction), 1) if duration is not None else None
+        steps = self.route.get("steps", [])
+        # Project Google step endpoints onto the same route geometry. This also
+        # advances a missed maneuver when fixes arrive beyond its endpoint.
+        while self.step_index < len(steps) - 1:
+            end = steps[self.step_index].get("end") or {}
+            if "latitude" not in end:
+                break
+            _, end_along, _ = project_on_route((end["latitude"], end["longitude"]), points)
+            if along < end_along - 8:
+                break
+            self.step_index += 1
+        if steps:
+            step = steps[self.step_index]
+            self.last_instruction = step.get("instruction")
+            self.maneuver = step.get("maneuver")
+            end = step.get("end") or {}
+            if "latitude" in end:
+                _, end_along, _ = project_on_route((end["latitude"], end["longitude"]), points)
+                self.distance_to_maneuver_m = round(max(0, end_along-along), 1)
+
+    def update(self, origin: Optional[Tuple[float, float]], min_interval_sec: float = 1.0) -> Optional[Dict[str, Any]]:
+        if self.state not in ("GUIDING", "PAUSED_GPS", "OFF_ROUTE") or self.destination_coords is None:
             return None
-        if origin is None or origin[0] is None:
-            return None
+        if origin is None or origin[0] is None or origin[1] is None:
+            self.location_available = False
+            if self.state == "PAUSED_GPS":
+                return None
+            self.state = "PAUSED_GPS"
+            self.last_instruction = None
+            return {"status": "GPS_UNAVAILABLE", "text": "Location lost. Navigation guidance is paused.",
+                    "speak": True, "navigation": self.health()}
 
         now = time.time()
-        dist = haversine_m(origin[0], origin[1], self.destination_coords[0], self.destination_coords[1])
-
+        resumed = self.state == "PAUSED_GPS"
+        if not resumed and now - self.last_update < min_interval_sec:
+            return None
+        generation = self._generation
+        previous_instruction = self.last_instruction
+        previous_step = self.step_index
+        self.state = "GUIDING"
+        self.location_available = True
+        self.last_update = now
+        dist = haversine_m(*origin, *self.destination_coords)
         if dist <= settings.NAVIGATION_ARRIVAL_RADIUS_M:
             self.state = "ARRIVED"
-            self.last_update = now
-            return {"status": "ARRIVED", "distance_m": round(dist, 1),
-                    "text": f"You have arrived at {self.destination_name}."}
-
-        if (now - self.last_update) < min_interval_sec:
-            return None
+            self.last_instruction = f"You have arrived at {self.destination_name}."
+            self.progress = 1.0
+            self.remaining_distance_m = self.remaining_duration_s = self.distance_to_maneuver_m = 0.0
+            return {"status": "ARRIVED", "distance_m": round(dist, 1), "text": self.last_instruction,
+                    "speak": True, "navigation": self.health()}
 
         if self.provider.name == "google":
-            # Advance along actual Google steps; never invent a straight-line instruction.
-            steps = self.route.get("steps", [])
-            while self.step_index < len(steps) - 1:
-                end = steps[self.step_index].get("end") or {}
-                if "latitude" not in end or haversine_m(*origin, end["latitude"], end["longitude"]) > 20:
-                    break
-                self.step_index += 1
-            self.last_update = now
-            if steps:
-                self.last_instruction = steps[self.step_index]["instruction"]
-            # Re-route when GPS is more than 60m from the route geometry.
             points = decode_polyline(self.route.get("polyline") or "")
-            if points and distance_to_route(origin, points) > settings.NAVIGATION_OFF_ROUTE_RADIUS_M:
+            if len(points) >= 2 and distance_to_route(origin, points) > settings.NAVIGATION_OFF_ROUTE_RADIUS_M:
                 self.state = "OFF_ROUTE"
-                generation = self._generation
+                # No repeated paid routing requests while a noisy fix stays off route.
+                if now - self.last_reroute < 15:
+                    self.last_instruction = None
+                    return {"status": "OFF_ROUTE", "text": "Off route. Guidance paused while waiting to reroute.",
+                            "speak": previous_instruction is not None, "navigation": self.health()}
+                self.last_reroute = now
                 route = self.provider.get_route(origin, self.destination_coords)
                 if generation != self._generation:
                     return None
                 if route.get("status") != "OK":
                     self.state = "UNAVAILABLE"
-                    return {"status": "UNAVAILABLE", "text": route.get("note"), "navigation": self.health()}
+                    self.last_instruction = None
+                    return {"status": "UNAVAILABLE", "text": route.get("note"), "speak": True, "navigation": self.health()}
                 self.route = route
                 self.step_index = 0
                 self.last_instruction = route.get("instruction")
                 self.state = "GUIDING"
-                return {"status": "REROUTED", "text": self.last_instruction, "navigation": self.health()}
-            return {"status": "GUIDING", "instruction": self.last_instruction, "text": self.last_instruction, "navigation": self.health()}
+                self._update_progress(origin)
+                return {"status": "REROUTED", "text": self.last_instruction, "speak": True, "navigation": self.health()}
+            self._update_progress(origin)
+            if self.last_instruction is None and self.route.get("steps"):
+                self.last_instruction = self.route["steps"][self.step_index]["instruction"]
+            return {"status": "GUIDING", "instruction": self.last_instruction, "text": self.last_instruction,
+                    "speak": resumed or previous_step != self.step_index or previous_instruction != self.last_instruction,
+                    "navigation": self.health()}
+
         route = self.provider.get_route(origin, self.destination_coords)
+        if generation != self._generation:
+            return None
         self.route = route
-        instruction = route.get("instruction")
-        self.last_instruction = instruction
-        self.last_update = now
-        return {
-            "status": "GUIDING",
-            "distance_m": round(dist, 1),
-            "instruction": instruction,
-            "text": f"{instruction} {int(round(dist))} meters to {self.destination_name}.",
-        }
+        self.last_instruction = route.get("instruction")
+        return {"status": "GUIDING", "distance_m": round(dist, 1), "instruction": self.last_instruction,
+                "text": self.last_instruction, "speak": resumed or previous_instruction != self.last_instruction,
+                "navigation": self.health()}
 
     def where_am_i(self, origin: Optional[Tuple[float, float]]) -> str:
         if origin is None or origin[0] is None:
@@ -358,6 +422,17 @@ class Navigator:
         h["instruction"] = self.last_instruction
         h["step_index"] = self.step_index
         h["last_update"] = self.last_update
+        h["location_available"] = self.location_available
+        h["progress"] = self.progress
+        h["remaining_distance_m"] = self.remaining_distance_m
+        h["remaining_duration_s"] = self.remaining_duration_s
+        h["distance_to_maneuver_m"] = self.distance_to_maneuver_m
+        h["maneuver"] = self.maneuver
+        steps = self.route.get("steps", [])
+        next_step = steps[self.step_index+1] if self.step_index+1 < len(steps) else {}
+        h["next_maneuver"] = next_step.get("maneuver")
+        h["next_instruction"] = next_step.get("instruction")
+        h["progress_source"] = "GPS projection onto Google route" if self.progress is not None and self.provider.name == "google" else None
         return h
 
 def decode_polyline(encoded):
@@ -383,13 +458,21 @@ def decode_polyline(encoded):
     return points
 
 
-def distance_to_route(origin, points):
-    # Local tangent-plane point-to-segment distance, in meters.
+def project_on_route(origin, points):
+    """Return lateral distance, distance along geometry, and total geometry length."""
     scale = math.cos(math.radians(origin[0]))
     xy = [((lon-origin[1])*111320*scale, (lat-origin[0])*111320) for lat,lon in points]
-    best = float("inf")
-    for a,b in zip(xy, xy[1:]):
+    best, along, accumulated = float("inf"), 0.0, 0.0
+    for index, (a,b) in enumerate(zip(xy, xy[1:])):
         dx,dy = b[0]-a[0], b[1]-a[1]
         t = max(0, min(1, -(a[0]*dx+a[1]*dy)/(dx*dx+dy*dy))) if dx*dx+dy*dy else 0
-        best = min(best, math.hypot(a[0]+t*dx, a[1]+t*dy))
-    return best
+        distance = math.hypot(a[0]+t*dx, a[1]+t*dy)
+        length = haversine_m(*points[index], *points[index+1])
+        if distance < best:
+            best, along = distance, accumulated+t*length
+        accumulated += length
+    return best, along, accumulated
+
+
+def distance_to_route(origin, points):
+    return project_on_route(origin, points)[0]

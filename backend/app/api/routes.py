@@ -309,6 +309,7 @@ class LocationRequest(BaseModel):
     lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
     lon: float = Field(ge=-180, le=180, allow_inf_nan=False)
     accuracy: float = Field(ge=0, allow_inf_nan=False)
+    timestamp: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
 
 @router.post('/api/v1/color')
 def api_color(req: ColorRequest = ColorRequest()):
@@ -318,8 +319,11 @@ def api_color(req: ColorRequest = ColorRequest()):
 def update_location(req: LocationRequest):
     if not isinstance(pipeline.gps, BrowserGPSProvider):
         raise HTTPException(409, 'Set GPS_SOURCE=browser on the backend to share browser location.')
-    location = pipeline.gps.update(req.lat, req.lon, req.accuracy)
-    pipeline._navigation_tick()
+    if req.timestamp is not None and not time.time()-30 <= req.timestamp <= time.time()+5:
+        raise HTTPException(422, 'Location fix is stale or its timestamp is in the future.')
+    location = pipeline.gps.update(req.lat, req.lon, req.accuracy, req.timestamp)
+    from backend.app.core.events import event_broker, EventType
+    event_broker.publish(EventType.SENSOR_UPDATE, {"location": location})
     return location
 
 @router.get('/api/sos')

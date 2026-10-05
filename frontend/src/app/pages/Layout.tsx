@@ -2,6 +2,7 @@ import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { Eye, OctagonX, Settings as SettingsIcon } from "lucide-react";
 import { api } from "../api";
 import { useApp } from "../store";
+import { stopLocationSharing } from "../locationSharing";
 import { Action, Badge } from "../components";
 export default function Layout() {
   const path = useLocation().pathname,
@@ -9,7 +10,8 @@ export default function Layout() {
   const online = useApp((s) => s.online),
     connection = useApp((s) => s.connection),
     error = useApp((s) => s.error),
-    updated = useApp((s) => s.updated);
+    updated = useApp((s) => s.updated),
+    locationSharing = useApp((s) => s.locationSharing);
   const role = sessionStorage.getItem("vm-role");
   if (!role || (admin && role !== "caregiver"))
     return <Navigate to="/" replace />;
@@ -46,13 +48,22 @@ export default function Layout() {
           <Link aria-label="Settings" to="/settings">
             <SettingsIcon size={20} />
           </Link>
-          <Link to="/" onClick={() => sessionStorage.removeItem("vm-role")}>
+          <Link
+            to="/"
+            onClick={() => {
+              stopLocationSharing();
+              sessionStorage.removeItem("vm-role");
+            }}
+          >
             Switch role
           </Link>
         </div>
       </header>
       <div className="connection-line">
         Events: {connection}
+        {locationSharing && (
+          <button onClick={stopLocationSharing}>Stop sharing location</button>
+        )}
         {updated && (
           <span>Last sync {new Date(updated).toLocaleTimeString()}</span>
         )}
@@ -69,7 +80,7 @@ export default function Layout() {
         <span>VisionMate / Drishti · Assistance from your device</span>
         <Action
           danger
-          label="STOP all activity"
+          label="STOP current task"
           run={() => api.action("/api/v1/stop")}
         />
         <OctagonX aria-hidden="true" />
