@@ -37,5 +37,5 @@ class AskModeHandler:
             "text": answer,
             "query": prompt,
             "priority": PriorityLevel.INTERACTION,
-            "success": True
+            "success": not answer.startswith(("Visual AI is unavailable", "Visual scene analysis took too long", "Unable to process camera image"))
         }

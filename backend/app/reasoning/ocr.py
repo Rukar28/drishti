@@ -43,7 +43,7 @@ class PPOCRv5Provider(OCRProvider):
             )
             logger.info("PaddleOCR PP-OCRv5 engine initialized successfully.")
         except Exception as e:
-            logger.warning(f"PaddleOCR failed to initialize: {e}. Using CV fallback engine.")
+            logger.warning(f"PaddleOCR failed to initialize: {e}. OCR is unavailable.")
             self.ocr_engine = None
 
     @staticmethod
@@ -151,11 +151,7 @@ class PPOCRv5Provider(OCRProvider):
             except Exception as e:
                 logger.error(f"[OCR-DEBUG] Error during PaddleOCR inference: {e}")
         else:
-            logger.warning("[OCR-DEBUG] 10. PaddleOCR predict() called: NO (Engine is None, using test fallback)")
-            # Fallback test pattern extraction for deterministic tests
-            if sharpness >= 30.0:
-                text_lines = ["VisionMate Assistant", "Room 302 - AI Lab Entrance", "Caution: Automated Doors Ahead"]
-                text_blocks = [{"text": t, "conf": 0.95} for t in text_lines]
+            logger.warning("[OCR-DEBUG] 10. PaddleOCR predict() called: NO (Engine is unavailable)")
         t_inf_ms = (time.perf_counter() - t_inf_start) * 1000.0
 
         logger.info(f"[OCR-DEBUG] 11. OCR detection result count: {raw_pred_count}")
@@ -169,7 +165,7 @@ class PPOCRv5Provider(OCRProvider):
         if not text_lines:
             t_post_ms = (time.perf_counter() - t_post_start) * 1000.0
             t_total_ms = (time.perf_counter() - t_total_start) * 1000.0
-            msg = "I couldn't read the text clearly."
+            msg = "I couldn't read the text because OCR is unavailable." if self.ocr_engine is None else "I couldn't read the text clearly."
             logger.info(f"[OCR-DEBUG] 16. Final Read Mode result: has_text=False (0 text lines recognized)")
             logger.info(f"[OCR-DEBUG] 17. Exact TTS message: '{msg}'")
             logger.info("=" * 60)

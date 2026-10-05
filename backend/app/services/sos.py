@@ -25,6 +25,8 @@ class SOSNotificationService:
     """
 
     def __init__(self):
+        self.last_result = None
+        self.location_provider = None
         self._last_sent_time: float = 0.0
         self._cooldown_sec: float = 60.0  # Default 60s cooldown
         self._enabled: bool = False
@@ -82,7 +84,7 @@ class SOSNotificationService:
         # Import here to avoid circular dependency
         from backend.app.hardware.gps import create_gps_provider
 
-        gps = create_gps_provider(settings.GPS_SOURCE)
+        gps = self.location_provider or create_gps_provider(settings.GPS_SOURCE)
         location = gps.get_location()
 
         if location.get("lat") is not None and location.get("lon") is not None:
@@ -223,6 +225,11 @@ class SOSNotificationService:
             self._last_sent_time = time.time()
 
         return result
+
+    def health(self):
+        remaining = max(0, self._cooldown_sec - (time.time() - self._last_sent_time))
+        return {"configured": self._enabled, "status": "not_configured" if not self._enabled else "cooldown" if remaining else "ready",
+                "cooldown_remaining_sec": remaining, "last_result": self.last_result}
 
     def reset_cooldown(self) -> None:
         """Reset cooldown timer (useful for testing)."""

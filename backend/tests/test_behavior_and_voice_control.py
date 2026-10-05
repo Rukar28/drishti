@@ -218,7 +218,13 @@ def test_12_same_find_direction_cooldown():
 
 
 # TEST 13: VLM Ask Mode returns comprehensive scene descriptions
-def test_13_vlm_comprehensive_scene_description():
+def test_13_vlm_comprehensive_scene_description(monkeypatch):
+    # Test successful provider response independently of a running Ollama server.
+    class Response:
+        status_code = 200
+        def json(self):
+            return {"response": "The scene shows a plain gray surface filling the view."}
+    monkeypatch.setattr("requests.post", lambda *args, **kwargs: Response())
     vlm = OllamaQwen3VLReasoner()
     ask_handler = AskModeHandler(vlm)
     

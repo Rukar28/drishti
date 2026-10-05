@@ -29,20 +29,25 @@ class MockGPSProvider(GPSProvider):
 
 
 class BrowserGPSProvider(GPSProvider):
-    """Placeholder for browser-pushed coordinates. No invented location."""
+    """Permission-based browser fixes expire after 30 seconds."""
+    def __init__(self):
+        self._location = None
 
-    def get_location(self) -> Dict[str, Any]:
-        return {
-            "lat": None,
-            "lon": None,
-            "accuracy": None,
-            "timestamp": time.time(),
-            "status": "NOT CONNECTED",
-            "source": "browser",
-        }
+    def update(self, lat, lon, accuracy):
+        self._location = {"lat": lat, "lon": lon, "accuracy": accuracy,
+                          "timestamp": time.time(), "status": "CONNECTED", "source": "browser"}
+        return self.get_location()
 
-    def health(self) -> Dict[str, Any]:
-        return {"provider": "browser", "status": "NOT CONNECTED", "connected": False}
+    def get_location(self):
+        if self._location and time.time() - self._location["timestamp"] <= 30:
+            return dict(self._location)
+        return {"lat": None, "lon": None, "accuracy": None,
+                "timestamp": self._location["timestamp"] if self._location else None,
+                "status": "STALE" if self._location else "NOT CONNECTED", "source": "browser"}
+
+    def health(self):
+        loc = self.get_location()
+        return {"provider": "browser", "status": loc["status"], "connected": loc["lat"] is not None}
 
 
 def create_gps_provider(source: str = "mock") -> GPSProvider:

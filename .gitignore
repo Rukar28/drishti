@@ -16,3 +16,10 @@ firmware/visionmate_esp32cam/secrets.h
 logs/
 *.zip
 *.log
+# Frontend generated files
+frontend/node_modules/
+frontend/dist/
+frontend/.npm-cache/
+frontend/*.tsbuildinfo
+.venv-1/
+frontend/legacy-draft/

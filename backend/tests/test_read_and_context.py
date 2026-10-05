@@ -56,8 +56,12 @@ def test_context_engine_spatial_grouping():
     assert "ahead" in narrative.lower()
     assert "left" in narrative.lower()
 
-def test_read_mode_ocr():
+def test_read_mode_ocr(monkeypatch):
     ocr_provider = PPOCRv5Provider()
+    class TestOCREngine:
+        def predict(self, image):
+            return [{"rec_texts": ["VISIONMATE ASSISTANT", "AI Lab Room 302"], "rec_scores": [0.99, 0.98]}]
+    monkeypatch.setattr(ocr_provider, "ocr_engine", TestOCREngine())
     read_handler = ReadModeHandler(ocr_provider)
     
     # Create test image with clear text
