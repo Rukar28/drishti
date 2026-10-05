@@ -100,16 +100,8 @@ class OllamaQwen3VLReasoner(VisionReasoner):
             logger.warning(f"Ollama VLM query timed out after {self.timeout}s.")
             return "Visual scene analysis took too long. Resuming guidance."
         except requests.exceptions.ConnectionError:
-            logger.warning("Ollama service not detected on localhost:11434. Using local structured fallback reasoner.")
+            logger.warning("Ollama service not detected on localhost:11434. Visual AI is unavailable.")
         except Exception as e:
             logger.error(f"VLM reasoning error: {e}")
 
-        # Intelligent structured local fallback when Ollama is offline
-        if is_comprehensive:
-            return (
-                "You appear to be in an indoor room facing a desk. A laptop is near the center, "
-                "with a bottle to its right. A chair is positioned in front of the desk. "
-                "A person is standing on your left side. The forward walkway is clear."
-            )
-        else:
-            return f"Visible item corresponding to '{prompt}' is positioned directly in front of you."
+        return "Visual AI is unavailable. Check the backend Ollama service and model."

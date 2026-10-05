@@ -728,7 +728,9 @@ class VisionMatePipeline:
         parsed: Dict[str, Any],
     ) -> Dict[str, Any]:
 
+        sos_service.location_provider = self.gps
         result = sos_service.send_emergency_alert()
+        sos_service.last_result = {**result, "location": self.gps.get_location(), "event_time": time.time()}
 
         if result["success"]:
             text = "Emergency alert sent."
@@ -2007,7 +2009,7 @@ class VisionMatePipeline:
             ),
             "objects": objects,
             "hazards": hazards,
-            "navigation": None,
+            "navigation": self.navigator.health(),
             "timestamp": (
                 time.strftime(
                     "%Y-%m-%dT%H:%M:%SZ",
@@ -2237,7 +2239,7 @@ class VisionMatePipeline:
             ),
 
             "ocr": {
-                "status": "ON_DEMAND",
+                "status": "READY" if self.ocr.ocr_engine is not None else "UNAVAILABLE",
                 "engine_loaded": (
                     self.ocr.ocr_engine
                     is not None
@@ -2507,12 +2509,6 @@ class VisionMatePipeline:
             self.camera.get_latest_frame()
         )
 
-        if frame is None:
-
-            frame = (
-                self.get_annotated_frame()
-            )
-
         capture_ms = (
             time.perf_counter()
             - t0
@@ -2572,12 +2568,6 @@ class VisionMatePipeline:
             self.camera.get_latest_frame()
         )
 
-        if frame is None:
-
-            frame = (
-                self.get_annotated_frame()
-            )
-
         res = (
             self.ask_handler.ask(
                 frame,
@@ -2610,12 +2600,6 @@ class VisionMatePipeline:
         frame = (
             self.camera.get_latest_frame()
         )
-
-        if frame is None:
-
-            frame = (
-                self.get_annotated_frame()
-            )
 
         return frame
 

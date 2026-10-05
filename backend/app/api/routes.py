@@ -295,3 +295,65 @@ def stop_navigation() -> Dict[str, Any]:
 def api_navigation_stop() -> Dict[str, Any]:
     return stop_navigation()
 
+
+# Frontend integration adapters; all recognition and notification remains in pipeline.
+from pydantic import Field
+from fastapi.responses import Response
+from backend.app.services.sos import sos_service
+from backend.app.hardware.gps import BrowserGPSProvider
+
+class ColorRequest(BaseModel):
+    target: Optional[str] = Field(default=None, max_length=120)
+
+class LocationRequest(BaseModel):
+    lat: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    lon: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    accuracy: float = Field(ge=0, allow_inf_nan=False)
+
+@router.post('/api/v1/color')
+def api_color(req: ColorRequest = ColorRequest()):
+    return pipeline.trigger_color(target=req.target)
+
+@router.post('/api/location')
+def update_location(req: LocationRequest):
+    if not isinstance(pipeline.gps, BrowserGPSProvider):
+        raise HTTPException(409, 'Set GPS_SOURCE=browser on the backend to share browser location.')
+    location = pipeline.gps.update(req.lat, req.lon, req.accuracy)
+    pipeline._navigation_tick()
+    return location
+
+@router.get('/api/sos')
+def sos_status():
+    return sos_service.health()
+
+@router.post('/api/sos')
+def trigger_sos():
+    return pipeline.handle_voice_command('sos')
+
+@router.get('/api/navigation/map')
+def navigation_map():
+    """Proxy an actual Google Static Map. Never send the upstream URL/key to clients."""
+    import httpx
+    loc = pipeline.gps.get_location()
+    if loc.get('lat') is None:
+        raise HTTPException(409, 'Location unavailable.')
+    if not settings.GOOGLE_MAPS_API_KEY:
+        raise HTTPException(503, 'Google Maps is not configured.')
+    nav = pipeline.navigator.health()
+    params = [('size', '640x400'), ('scale', '2'), ('key', settings.GOOGLE_MAPS_API_KEY),
+              ('markers', f"color:blue|label:U|{loc['lat']},{loc['lon']}")]
+    dest = nav.get('destination_coords')
+    if dest:
+        params.append(('markers', f'color:red|label:D|{dest[0]},{dest[1]}'))
+    polyline = nav.get('route', {}).get('polyline')
+    if polyline:
+        params.append(('path', 'color:0x35a9c8ff|weight:5|enc:' + polyline))
+    if not dest:
+        params.extend([('center', f"{loc['lat']},{loc['lon']}"), ('zoom', '16')])
+    try:
+        response = httpx.get('https://maps.googleapis.com/maps/api/staticmap', params=params, timeout=12)
+        if response.status_code != 200 or not response.headers.get('content-type', '').startswith('image/'):
+            raise HTTPException(502, 'Google map unavailable. Check Maps Static API enablement and key restrictions.')
+        return Response(response.content, media_type=response.headers['content-type'], headers={'Cache-Control': 'private, max-age=15'})
+    except httpx.HTTPError:
+        raise HTTPException(502, 'Google map request failed.')
