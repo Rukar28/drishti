@@ -1,6 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.voice-hud { margin-bottom: 1.5rem; border-left: 4px solid #67d5e5; }
+.voice-current { font-size: clamp(1.3rem, 3vw, 2rem); color: #8ce5ef; font-weight: 700; }
 :root {
   font-family:
     Inter,
@@ -542,4 +545,11 @@ footer svg {
     transition: none !important;
     animation: none !important;
   }
+}
+progress {
+  display: block;
+  width: 100%;
+  height: 12px;
+  accent-color: #35a9c8;
+  margin: 10px 0;
 }

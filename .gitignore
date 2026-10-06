@@ -23,3 +23,4 @@ frontend/.npm-cache/
 frontend/*.tsbuildinfo
 .venv-1/
 frontend/legacy-draft/
+frontend/.env.local

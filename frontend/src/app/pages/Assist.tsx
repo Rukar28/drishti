@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { useApp } from "../store";
 import { Panel, Result } from "../components";
+import VoiceStatus from "../VoiceStatus";
 import type { ActionResult } from "../types";
 const features = [
   ["find", "Find an object", "Locate a target in the camera view."],
@@ -33,8 +34,10 @@ export default function Assist() {
   return (
     <>
       <h1>Assist</h1>
+      <VoiceStatus />
       <p className="muted">
-        Choose a task. VisionMate uses the device’s camera and backend.
+        Manual fallback controls. These use the same device camera and backend
+        features.
       </p>
       <div className="assist-layout">
         <div className="feature-list">

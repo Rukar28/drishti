@@ -34,6 +34,9 @@ class CommandBus:
         logger.info("[INTENT] %s from '%s' conf=%.2f", intent, transcript, float(parsed.get("confidence") or 0.0))
 
         handler = self._handlers.get(intent)
+        event_broker.publish(EventType.VOICE_EXECUTING, {
+            "intent": intent, "transcript": transcript,
+        })
         if handler is None:
             result = {
                 "intent": intent,

@@ -298,6 +298,10 @@ class WakeWordProvider(ABC):
     def reset(self) -> None:
         return None
 
+    def suspend_capture(self) -> None:
+        """Release capture while another part of the voice session owns audio."""
+        return None
+
     def health(self) -> Dict[str, Any]:
         return {
             "provider": self.name,
@@ -1020,6 +1024,8 @@ class OpenWakeWordProvider(WakeWordProvider):
 
             self._warned_mic = False
 
+            self.last_error = None
+
             return True
 
         except Exception as exc:
@@ -1069,6 +1075,10 @@ class OpenWakeWordProvider(WakeWordProvider):
 
         except Exception:
             pass
+
+    def suspend_capture(self) -> None:
+        self._release_stream()
+        self.reset()
 
     # ========================================================================
     # ERROR HANDLING

@@ -33,9 +33,9 @@ class BrowserGPSProvider(GPSProvider):
     def __init__(self):
         self._location = None
 
-    def update(self, lat, lon, accuracy):
+    def update(self, lat, lon, accuracy, timestamp=None):
         self._location = {"lat": lat, "lon": lon, "accuracy": accuracy,
-                          "timestamp": time.time(), "status": "CONNECTED", "source": "browser"}
+                          "timestamp": timestamp if timestamp is not None else time.time(), "received_at": time.time(), "status": "CONNECTED", "source": "browser"}
         return self.get_location()
 
     def get_location(self):

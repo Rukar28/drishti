@@ -43,6 +43,7 @@ class ReadModeHandler:
                 "text": ocr_res.get("short_summary") or "No text detected in view.",
                 "priority": PriorityLevel.INTERACTION,
                 "has_text": False,
+                "status": ocr_res.get("status", "NO_TEXT"),
                 "metrics": ocr_res.get("metrics", {})
             }
 

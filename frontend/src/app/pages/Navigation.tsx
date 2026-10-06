@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Navigate, Route } from "react-router-dom";
+import { useState } from "react";
+import { startLocationSharing, stopLocationSharing } from "../locationSharing";
 import { api } from "../api";
 import { useApp } from "../store";
 import { Action, Badge, MapView, Panel } from "../components";
@@ -10,15 +10,9 @@ export default function Navigation({
 }) {
   const nav = useApp((s) => s.navigation),
     loc = useApp((s) => s.location);
-  const [destination, setDestination] = useState(""),
-    [watch, setWatch] = useState<number | null>(null),
-    [error, setError] = useState("");
-  useEffect(
-    () => () => {
-      if (watch !== null) navigator.geolocation.clearWatch(watch);
-    },
-    [watch],
-  );
+  const [destination, setDestination] = useState("");
+  const sharing = useApp((s) => s.locationSharing);
+  const error = useApp((s) => s.locationError);
   return (
     <>
       <h1>{caregiver ? "Device location" : "Navigate"}</h1>
@@ -34,49 +28,16 @@ export default function Navigation({
           {!caregiver && (
             <>
               <button
-                onClick={() => {
-                  if (watch !== null) {
-                    navigator.geolocation.clearWatch(watch);
-                    setWatch(null);
-                    return;
-                  }
-                  if (!navigator.geolocation) {
-                    setError("Browser geolocation unavailable.");
-                    return;
-                  }
-                  setError("");
-                  const id = navigator.geolocation.watchPosition(
-                    (p) => {
-                      void api
-                        .locationUpdate(p.coords)
-                        .then((location) => useApp.getState().set({ location }))
-                        .catch((e) => {
-                          setError(e.message);
-                          navigator.geolocation.clearWatch(id);
-                          setWatch(null);
-                        });
-                    },
-                    (e) => {
-                      setError(e.message);
-                      navigator.geolocation.clearWatch(id);
-                      setWatch(null);
-                    },
-                    {
-                      enableHighAccuracy: true,
-                      timeout: 15000,
-                      maximumAge: 5000,
-                    },
-                  );
-                  setWatch(id);
-                }}
+                onClick={sharing ? stopLocationSharing : startLocationSharing}
               >
-                {watch === null
+                {!sharing
                   ? "Share this device’s location"
                   : "Stop sharing location"}
               </button>
               <p className="muted">
                 Requires browser permission and GPS_SOURCE=browser on the
-                backend. Sharing ends when you leave this page.
+                backend. Sharing continues across pages until you stop it,
+                switch roles, or close this tab.
               </p>
             </>
           )}
@@ -120,6 +81,25 @@ export default function Navigation({
               ["State", nav?.state],
               ["Destination", nav?.active_destination],
               ["Instruction", nav?.instruction],
+              ["Next maneuver", nav?.next_instruction || nav?.next_maneuver],
+              [
+                "Distance to step end",
+                nav?.distance_to_maneuver_m == null
+                  ? null
+                  : `${Math.round(nav.distance_to_maneuver_m)} m`,
+              ],
+              [
+                "Remaining distance (estimate)",
+                nav?.remaining_distance_m == null
+                  ? null
+                  : `${Math.round(nav.remaining_distance_m)} m`,
+              ],
+              [
+                "Remaining duration (estimate)",
+                nav?.remaining_duration_s == null
+                  ? null
+                  : `${Math.ceil(nav.remaining_duration_s / 60)} min`,
+              ],
               [
                 "Route distance",
                 nav?.route?.distance_m == null
@@ -139,9 +119,27 @@ export default function Navigation({
               </div>
             ))}
           </dl>
+          {nav?.progress != null && (
+            <label>
+              Route progress{" "}
+              <progress
+                aria-label="Route progress"
+                max={1}
+                value={nav.progress}
+              />
+              <span>{Math.round(nav.progress * 100)}%</span>
+            </label>
+          )}
+          {nav?.state === "PAUSED_GPS" && (
+            <p role="alert" className="error">
+              Location unavailable. Navigation guidance is paused until a fresh
+              fix arrives.
+            </p>
+          )}
           <p className="muted">
-            Distance and ETA are the provider’s route estimate at calculation
-            time.
+            Remaining estimates use GPS projection onto the returned route. They
+            are not live traffic estimates. Distance and ETA are the provider’s
+            route estimate at calculation time.
           </p>
           {nav?.error && <p className="error">{nav.error}</p>}
           {nav?.route?.warnings?.map((w) => (

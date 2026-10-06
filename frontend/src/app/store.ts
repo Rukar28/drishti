@@ -9,6 +9,14 @@ import type {
   Envelope,
 } from "./types";
 interface State {
+  voiceTranscript: string;
+  voiceIntent: string;
+  voiceResult: import("./types").ActionResult | null;
+  voiceError: string;
+  wakeDetectedAt: string | null;
+  speaking: boolean;
+  locationSharing: boolean;
+  locationError: string;
   assistant: string;
   online: boolean;
   connection: string;
@@ -26,6 +34,14 @@ interface State {
   event: (e: Envelope) => void;
 }
 export const useApp = create<State>((set) => ({
+  voiceTranscript: "",
+  voiceIntent: "",
+  voiceResult: null,
+  voiceError: "",
+  wakeDetectedAt: null,
+  speaking: false,
+  locationSharing: false,
+  locationError: "",
   assistant: "",
   online: false,
   connection: "Connecting",

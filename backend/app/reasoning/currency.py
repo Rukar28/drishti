@@ -98,6 +98,10 @@ class CurrencyRecognizer:
         recognized = (ocr.get("full_text") or "").strip()
         has_text = bool(ocr.get("has_text")) and bool(recognized)
 
+        if ocr.get("status") == "UNAVAILABLE":
+            return {"status": "UNAVAILABLE", "text": ocr.get("short_summary", "OCR is unavailable."),
+                    "has_result": False, "recognized_text": "", "priority": PriorityLevel.INTERACTION}
+
         if not has_text:
             return {
                 "text": "I could not read any currency text. Please hold the note steady and closer.",

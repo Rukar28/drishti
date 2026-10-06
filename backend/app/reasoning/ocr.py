@@ -36,8 +36,14 @@ class PPOCRv5Provider(OCRProvider):
         """Initializes and caches the PP-OCRv5 engine once."""
         try:
             from paddleocr import PaddleOCR
+            import paddle
             # Initialize PP-OCRv5 model with textline orientation detection
             self.ocr_engine = PaddleOCR(
+                ocr_version="PP-OCRv5",
+                device="gpu" if self.use_gpu and paddle.device.is_compiled_with_cuda() else "cpu",
+                enable_mkldnn=False,
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
                 use_textline_orientation=True,
                 lang="en"
             )
@@ -97,14 +103,6 @@ class PPOCRv5Provider(OCRProvider):
         is_valid = bool(image.size > 0 and np.max(image) > 0)
         logger.info(f"[OCR-DEBUG] 5. Frame contains valid image: {'YES' if is_valid else 'NO'} (pixel range: {int(np.min(image))}..{int(np.max(image))})")
 
-        # Save debug frame for manual inspection
-        try:
-            os.makedirs("logs", exist_ok=True)
-            cv2.imwrite("logs/debug_read_frame.jpg", image)
-            logger.info("[OCR-DEBUG] Saved raw frame to logs/debug_read_frame.jpg")
-        except Exception as e:
-            logger.warning(f"[OCR-DEBUG] Failed to save debug frame: {e}")
-
         # 1. Preprocess
         t_prep_start = time.perf_counter()
         enhanced_img, sharpness = self._preprocess_image(image)
@@ -122,6 +120,7 @@ class PPOCRv5Provider(OCRProvider):
         t_inf_start = time.perf_counter()
         predict_called = False
         raw_pred_count = 0
+        inference_error = False
 
         if self.ocr_engine is not None:
             predict_called = True
@@ -149,6 +148,7 @@ class PPOCRv5Provider(OCRProvider):
                                     "conf": round(conf, 3)
                                 })
             except Exception as e:
+                inference_error = True
                 logger.error(f"[OCR-DEBUG] Error during PaddleOCR inference: {e}")
         else:
             logger.warning("[OCR-DEBUG] 10. PaddleOCR predict() called: NO (Engine is unavailable)")
@@ -165,13 +165,14 @@ class PPOCRv5Provider(OCRProvider):
         if not text_lines:
             t_post_ms = (time.perf_counter() - t_post_start) * 1000.0
             t_total_ms = (time.perf_counter() - t_total_start) * 1000.0
-            msg = "I couldn't read the text because OCR is unavailable." if self.ocr_engine is None else "I couldn't read the text clearly."
+            msg = "I couldn't read the text because OCR is unavailable." if (self.ocr_engine is None or inference_error) else "I couldn't read the text clearly."
             logger.info(f"[OCR-DEBUG] 16. Final Read Mode result: has_text=False (0 text lines recognized)")
             logger.info(f"[OCR-DEBUG] 17. Exact TTS message: '{msg}'")
             logger.info("=" * 60)
             return {
                 "full_text": "",
                 "short_summary": msg,
+                "status": "UNAVAILABLE" if self.ocr_engine is None or inference_error else "NO_TEXT",
                 "text_blocks": [],
                 "has_text": False,
                 "model_name": self.model_name,

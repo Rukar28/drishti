@@ -7,6 +7,7 @@ not a fixed 3-second window.
 
 import logging
 import re
+import time
 from typing import Callable, Optional, Dict, Any
 
 import numpy as np
@@ -99,6 +100,7 @@ class LocalASRProvider(ASRProvider):
         self.vad.reset()
         frame_samples = self.vad.frame_samples
         logger.info("[VOICE] Listening (VAD, %d Hz)...", self.sample_rate)
+        deadline = time.monotonic() + 20.0
         try:
             with sd.InputStream(
                 samplerate=self.sample_rate,
@@ -108,7 +110,7 @@ class LocalASRProvider(ASRProvider):
                 device=device,
             ) as stream:
                 while True:
-                    if stop_flag is not None and stop_flag():
+                    if time.monotonic() >= deadline or (stop_flag is not None and stop_flag()):
                         return None
                     frames, overflowed = stream.read(frame_samples)
                     if overflowed:
@@ -125,10 +127,15 @@ class LocalASRProvider(ASRProvider):
         self,
         stop_flag: Optional[Callable[[], bool]] = None,
         device: Optional[int] = None,
+        on_processing: Optional[Callable[[], None]] = None,
     ) -> Optional[str]:
         audio = self.capture_utterance(stop_flag=stop_flag, device=device)
         if audio is None:
             return None
+        if stop_flag is not None and stop_flag():
+            return None
+        if on_processing:
+            on_processing()
         return self.listen_chunk(audio)
 
     def listen_once(

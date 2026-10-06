@@ -89,45 +89,43 @@ class WindowsSAPITTSProvider(TTSProvider):
                 if text:
                     logger.info(f"[TTS SPEAK P{priority} G{gen_id} {source}]: '{text}'")
                     try:
+                        if self._voice is None:
+                            event_broker.publish(EventType.ERROR, {
+                                "source": "tts", "message": "Windows speech output is unavailable.",
+                            })
+                            continue
+                        self._is_speaking = True
+                        self._voice.Speak(text, 1 | (2 if interrupt else 0))
                         event_broker.publish(EventType.TTS_STARTED, {
                             "text": text, "priority": priority, "source": source,
+                            "generation": gen_id,
                         })
-                    except Exception:
-                        pass
-                    
-                    if self._voice is not None:
-                        try:
-                            # Always async (SVSFlagsAsync = 1) so the worker never blocks
-                            # and can act on purge/interrupt immediately. Interrupt adds
-                            # SVSFPurgeBeforeSpeak = 2.
-                            flags = 1 | (2 if interrupt else 0)
-                            self._voice.Speak(text, flags)
-                            self._is_speaking = True
-                            # Best-effort speaking window (no blocking COM poll).
-                            self._speaking_until = time.time() + min(15.0, max(0.4, len(text) * 0.06))
-                        except Exception as ex:
-                            logger.error(f"SAPI speak exception: {ex}")
-                    else:
-                        self._is_speaking = True
-                        time.sleep(min(1.0, len(text) * 0.04))
+                        cancelled = False
+                        # Poll SAPI's real completion, on its owning COM thread.
+                        # Keep STOP/priority interruption responsive while waiting.
+                        while self._running:
+                            if self._purge_requested or gen_id < self.speech_generation:
+                                self._voice.Speak("", 2)
+                                self._purge_requested = False
+                                cancelled = True
+                                break
+                            if self._voice.WaitUntilDone(20):
+                                break
+                        event_broker.publish(EventType.TTS_FINISHED, {
+                            "text": text, "priority": priority, "source": source,
+                            "generation": gen_id, "cancelled": cancelled,
+                        })
+                    except Exception as ex:
+                        logger.error("SAPI speak exception: %s", ex)
+                        event_broker.publish(EventType.ERROR, {
+                            "source": "tts", "message": "Speech output failed.",
+                        })
+                    finally:
                         self._is_speaking = False
-
-                    if self._voice is None:
-                        try:
-                            event_broker.publish(EventType.TTS_FINISHED, {
-                                "text": text, "priority": priority, "source": source,
-                            })
-                        except Exception:
-                            pass
+                        self._queue.task_done()
+                else:
                     self._queue.task_done()
             except queue.Empty:
-                # Speech may have completed; refresh the best-effort speaking flag.
-                if self._is_speaking and time.time() >= self._speaking_until:
-                    self._is_speaking = False
-                    try:
-                        event_broker.publish(EventType.TTS_FINISHED, {"text": "", "priority": 0, "source": "SYSTEM"})
-                    except Exception:
-                        pass
                 continue
             except Exception as e:
                 logger.error(f"Unexpected error in TTS speech loop: {e}")
@@ -208,6 +206,10 @@ class WindowsSAPITTSProvider(TTSProvider):
                     break
             for it in items:
                 self._queue.put(it)
+
+    def is_busy(self) -> bool:
+        """Include enqueued speech so a producer/worker race cannot reopen ASR."""
+        return self._is_speaking or self._queue.unfinished_tasks > 0 or self._purge_requested
 
     def is_speaking(self) -> bool:
         return self._is_speaking
