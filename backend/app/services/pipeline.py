@@ -1245,6 +1245,7 @@ class VisionMatePipeline:
                 if (
                     speech_cmd
                     and "text" in speech_cmd
+                    and (not self.voice_fsm.is_active() or speech_cmd.get("interrupt", False))
                 ):
 
                     txt = speech_cmd["text"]
@@ -1359,6 +1360,15 @@ class VisionMatePipeline:
     # VOICE LOOP
     # =========================================================================
 
+    def _wait_for_voice_speech(self):
+        """Do not reacquire the microphone while queued/active SAPI output drains."""
+        if self.tts.is_busy():
+            self.wake_provider.suspend_capture()
+        while self._voice_running and self.tts.is_busy():
+            if self.tts.is_speaking():
+                self.voice_fsm.transition(VoiceState.SPEAKING, "actual TTS playback")
+            time.sleep(0.02)
+
     def _voice_loop(self):
 
         wake_mode = (
@@ -1433,10 +1443,9 @@ class VisionMatePipeline:
                 # WAITING FOR WAKE
                 # -------------------------------------------------------------
 
-                self.voice_fsm.force(
-                    VoiceState.IDLE,
-                    "loop-start",
-                )
+                self._wait_for_voice_speech()
+                if not self._voice_running:
+                    break
 
                 self.voice_fsm.transition(
                     VoiceState.LISTENING_FOR_WAKE,
@@ -1447,14 +1456,14 @@ class VisionMatePipeline:
                     self.wake_provider.wait_for_wake(
                         stop_flag=(
                             lambda:
-                            not self._voice_running
+                            not self._voice_running or self.tts.is_busy()
                         ),
                         timeout=1.0,
                     )
                 )
 
                 if not wake_detected:
-
+                    time.sleep(0.05)
                     continue
 
                 # -------------------------------------------------------------
@@ -1486,6 +1495,7 @@ class VisionMatePipeline:
                 # Optional acknowledgement
                 # -------------------------------------------------------------
 
+                self.tts.stop()  # discard background guidance queued before wake
                 if settings.WAKE_WORD_ACK_TEXT:
 
                     self.tts.speak(
@@ -1503,6 +1513,9 @@ class VisionMatePipeline:
                 # ASR/VAD can now acquire it.
                 # -------------------------------------------------------------
 
+                self._wait_for_voice_speech()
+                if self.voice_fsm.generation != gen_at_wake or not self._voice_running:
+                    continue
                 self.voice_fsm.transition(
                     VoiceState.LISTENING_FOR_COMMAND,
                     "capture command",
@@ -1512,8 +1525,11 @@ class VisionMatePipeline:
                     self.asr.listen_utterance(
                         stop_flag=(
                             lambda:
-                            not self._voice_running
-                        )
+                            not self._voice_running or self.voice_fsm.generation != gen_at_wake
+                        ),
+                        on_processing=lambda: self.voice_fsm.transition(
+                            VoiceState.PROCESSING, "transcribing captured command"
+                        ),
                     )
                 )
 
@@ -1526,9 +1542,14 @@ class VisionMatePipeline:
 
                     continue
 
-                transcript = (
-                    transcript.strip()
-                )
+                transcript = transcript.strip()
+                # The acoustic provider is the only wake gate. An ASR echo of
+                # the wake phrase alone must never become a command.
+                import re
+                transcript = re.sub(r"^hey\s+mycroft[,.!]?\s*", "", transcript, flags=re.I).strip()
+                if not transcript:
+                    self.voice_fsm.transition(VoiceState.IDLE, "wake echo only")
+                    continue
 
                 # -------------------------------------------------------------
                 # STOP / GENERATION SAFETY
@@ -1591,22 +1612,11 @@ class VisionMatePipeline:
                 # SPEAKING / RETURN TO IDLE
                 # -------------------------------------------------------------
 
-                if self.tts.is_speaking():
-
-                    self.voice_fsm.transition(
-                        VoiceState.SPEAKING,
-                        "tts active",
-                    )
-
-                elif (
-                    self.voice_fsm.state
-                    != VoiceState.IDLE
-                ):
-
-                    self.voice_fsm.transition(
-                        VoiceState.IDLE,
-                        "session complete",
-                    )
+                if result.get("status") in ("unrecognized", "not_available"):
+                    self.tts.speak(result.get("message", "Command unavailable."),
+                                   priority=PriorityLevel.USER_COMMAND, source="VOICE")
+                self._wait_for_voice_speech()
+                self.voice_fsm.transition(VoiceState.LISTENING_FOR_WAKE, "command and speech complete")
 
             except Exception as e:
 
@@ -2160,7 +2170,7 @@ class VisionMatePipeline:
             "speech_engine": {
                 "status": (
                     "READY"
-                    if self.tts is not None
+                    if self.tts is not None and getattr(self.tts, "_voice", None) is not None
                     else "UNAVAILABLE"
                 ),
                 "speaking": (
@@ -2625,7 +2635,7 @@ class VisionMatePipeline:
                 text,
                 priority=PriorityLevel.INTERACTION,
                 source="COLOR",
-            generation_id=generation,
+                generation_id=generation,
             )
 
             try:

@@ -36,13 +36,13 @@ class VoiceState(str, Enum):
 _TRANSITIONS: Dict[VoiceState, List[VoiceState]] = {
     VoiceState.IDLE: [
         VoiceState.LISTENING_FOR_WAKE, VoiceState.LISTENING_FOR_COMMAND,
-        VoiceState.COOLDOWN, VoiceState.IDLE,
+        VoiceState.COOLDOWN, VoiceState.IDLE, VoiceState.SPEAKING,
     ],
     VoiceState.LISTENING_FOR_WAKE: [
-        VoiceState.WAKE_DETECTED, VoiceState.IDLE, VoiceState.COOLDOWN, VoiceState.LISTENING_FOR_WAKE,
+        VoiceState.WAKE_DETECTED, VoiceState.IDLE, VoiceState.COOLDOWN, VoiceState.LISTENING_FOR_WAKE, VoiceState.SPEAKING,
     ],
     VoiceState.WAKE_DETECTED: [
-        VoiceState.LISTENING_FOR_COMMAND, VoiceState.IDLE, VoiceState.COOLDOWN,
+        VoiceState.LISTENING_FOR_COMMAND, VoiceState.IDLE, VoiceState.COOLDOWN, VoiceState.SPEAKING,
     ],
     VoiceState.LISTENING_FOR_COMMAND: [
         VoiceState.PROCESSING, VoiceState.LISTENING_FOR_WAKE, VoiceState.IDLE,
@@ -55,7 +55,7 @@ _TRANSITIONS: Dict[VoiceState, List[VoiceState]] = {
         VoiceState.SPEAKING, VoiceState.LISTENING_FOR_WAKE, VoiceState.IDLE, VoiceState.COOLDOWN,
     ],
     VoiceState.SPEAKING: [
-        VoiceState.LISTENING_FOR_WAKE, VoiceState.IDLE, VoiceState.COOLDOWN,
+        VoiceState.LISTENING_FOR_WAKE, VoiceState.LISTENING_FOR_COMMAND, VoiceState.IDLE, VoiceState.COOLDOWN,
     ],
     VoiceState.COOLDOWN: [
         VoiceState.LISTENING_FOR_WAKE, VoiceState.LISTENING_FOR_COMMAND, VoiceState.IDLE,

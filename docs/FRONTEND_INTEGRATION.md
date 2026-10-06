@@ -1,55 +1,60 @@
-# Frontend integration progress
+# VisionMate integration verification — 2026-10-06
 
-Audit: existing frontend is incomplete (missing App, mismatched API methods/types and invented SOS endpoint). Backend REST and event contracts verified. No auth exists; role selection must be explicitly prototype-only. ASK is Ollama, not Gemini. Focus and Face are unavailable.
+## Preserved implementation
 
-Contract map:
-- Home: /api/world (WORLD_UPDATE), /api/status, /health, /metrics, /api/voice; binary annotated JPEG /ws/stream.
-- Events: one /ws/events {type,timestamp,data}; world, voice, TTS, mode, navigation, hazards, SOS, errors. Bounded session history only.
-- Assist: POST /api/v1/find {target}, /read {full_reading}, /ask {query}, /currency, /medicine; new thin /color {target} adapter.
-- STOP: POST /api/v1/stop. GUIDANCE: POST /api/v1/mode {mode:'guidance'}.
-- Navigation: /api/navigation GET, POST {destination}, /api/navigation/stop. Extend Google provider with Geocoding + Routes walking API, safe route/steps/polyline state. Proxy Google Static Map.
-- Location: /api/location GET; new validated POST only when GPS_SOURCE=browser, fixes expire in 30 seconds.
-- SOS: new GET /api/sos safe configuration/result, POST adapter to existing command bus; reuse live GPS for notification.
+Continued the existing FastAPI pipeline, React pages, camera providers, YOLO/tracking/world state, command bus, ASR, real Hey Mycroft provider, SAPI TTS, navigation, GPS, SOS, and AI handlers. No replacement dashboard or second voice/navigation architecture was introduced. The preceding frontend/navigation integration is preserved in commit `bf7f9ef` on branch `frontend`.
 
-Implementation underway. Final validation/results will be recorded here.
-## Implemented backend changes
+## Voice continuation
 
-- Google provider now uses backend-only Geocoding + current Routes `computeRoutes` with WALK, specific response field mask, real steps/distance/duration/polyline/warnings, bounded network timeouts and sanitized failures.
-- Navigator exposes route, destination coordinates, current step/instruction, last update; advances steps, detects arrival/off-route, reroutes, and prevents cancelled requests from resurrecting navigation. Route distance/ETA remain the provider's calculation-time estimates, clearly labeled in the UI.
-- Browser GPS validates coordinates/accuracy and expires fixes after 30 seconds. Location updates tick navigation even if the camera is unavailable.
-- `/api/navigation/map` proxies Google Static Maps images with position/destination/polyline, keeping credentials private.
-- `/api/v1/color` and `/api/sos` are thin adapters to existing pipeline/command-bus flows. SOS status exposes safe configuration/cooldown/latest result and uses active GPS for notification location.
-- Public world snapshots include actual navigation health.
-- Removed pre-existing fabricated OCR text and canned offline VLM descriptions. Assistance never processes the standby/HUD frame. Missing providers/frame report unavailable.
-- Google HTTP client informational URL logging is disabled to prevent credential-bearing query strings entering logs.
-- Two existing successful OCR/VLM unit tests now inject deterministic provider responses instead of relying on fabricated runtime fallbacks; their original assertions remain. Added explicit tests for missing engine/service, Google routes/errors, key privacy, GPS validation/expiry, map proxy, STOP races and route geometry.
+- The existing voice loop now waits for queued and active speech, then returns automatically to wake listening. It no longer forcibly resets every second while speech is running.
+- SAPI's COM worker polls `WaitUntilDone(20)` instead of estimating completion from text length. STOP purges playback and invalidates late speech; queued work counts as busy before playback begins. Missing SAPI emits an error, not simulated speech success.
+- Wake detection hands microphone ownership to command capture. Capture is bounded to 20 seconds, reports PROCESSING before actual transcription, and rejects commands captured before STOP. A wake-phrase-only transcript is discarded rather than executed.
+- Background microphone capture is suspended and acoustic buffers reset during speech. Routine scene narration is suppressed during the active command; interrupting safety alerts remain available.
+- Existing intent parser and handlers remain the execution path for COLOR, FIND, READ, ASK, CURRENCY, MEDICINE, NAVIGATION, SOS, STOP and explicitly unavailable FACE. `VOICE_EXECUTING` exposes the selected intent before processing; existing `VOICE_COMMAND` exposes the actual result.
+- Assist now prominently shows actual backend state, wake time, transcript, recognized feature, result, speech state, errors, and a bounded recent-event list. Manual controls remain below it. React never records audio or runs an independent voice state machine.
+- The frontend proxy uses backend 8000 for this session. Both REST and WebSocket traffic flow through Vite on 3000. Reconnection/poll recovery and existing camera stream cleanup are preserved.
 
-## Frontend structure and routes
+## Dependency repairs
 
-React 18 + TypeScript + Vite + React Router + Zustand + Tailwind + Lucide. `src/app/pages` holds role entry, layout, Home, Assist, Navigation, Safety, Overview, History and Settings. Shared components handle frames, maps, SOS, device status, async responses and status labels. `api.ts` centralizes origins, request bodies, JSON/error handling and bounded timeouts; `realtime.ts` manages one event connection with cleanup/backoff and periodic state recovery; `store.ts` contains shared state. JPEG frames remain isolated from the app store, with object URLs revoked on replacement/unmount. UI uses top navigation, keyboard controls, focus styles, mobile layouts, reduced-motion support and persistent STOP.
+`requirements.txt` now includes openWakeWord 0.6.0, PaddleOCR 3.7.0 and PaddlePaddle 3.3.1. These are installed in the project `.venv`; `pip check` passes. Use that interpreter rather than an unrelated global Python environment.
 
-Routes: `/`, `/admin/login`, `/home`, `/assist`, `/navigate`, `/safety`, `/settings`, `/admin`, `/admin/location`, `/admin/safety`, `/admin/history`, `/admin/device`.
+Real Hey Mycroft ONNX, Faster-Whisper tiny.en, webcam and YOLO CPU initialized in the running backend. PaddleOCR's first real inference failed in the oneDNN path. The existing provider now explicitly selects PP-OCRv5, disables that incompatible CPU acceleration, and disables unnecessary document rotation/unwarping. A generated image containing **VISIONMATE READ TEST** was processed by the actual Paddle model and returned that exact text at 0.999 recognition confidence. This is a real model test on a fixture, not a live camera READ claim. Inference exceptions now return UNAVAILABLE rather than misleading NO_TEXT.
 
-REST consumed: GET `/health`, `/api/status`, `/api/world`, `/metrics`, `/api/location`, `/api/navigation`, `/api/navigation/map`, `/api/sos`; POST `/api/v1/mode`, `/api/v1/find`, `/api/v1/read`, `/api/v1/ask`, `/api/v1/color`, `/api/v1/currency`, `/api/v1/medicine`, `/api/v1/stop`, `/api/navigation`, `/api/navigation/stop`, `/api/location`, `/api/sos`.
+## Existing navigation and API contracts
 
-WebSockets: `/ws/events` JSON envelopes and `/ws/stream` binary JPEG. Frontend subscribes to actual event names; high-frequency world/voice-state updates are excluded from meaningful session history. Last spoken assistant text comes from actual TTS events or backend status.
+- Home: GET `/health`, `/api/status`, `/api/world`, `/metrics`; `/ws/stream` annotated binary JPEG and `/ws/events` typed JSON envelopes.
+- Assist: POST `/api/v1/find`, `/read`, `/ask`, `/color`, `/currency`, `/medicine`, `/stop`. Text command API and microphone sessions dispatch through the existing command bus.
+- Navigation: GET/POST `/api/navigation`, POST `/api/navigation/stop`, GET/POST `/api/location`, GET `/api/navigation/map`.
+- Google Geocoding resolves destinations; Routes `computeRoutes` WALK supplies steps, maneuvers, distance, duration and geometry; Static Maps images are proxied with private credentials kept on the backend.
+- The existing Navigator projects fixes onto route geometry for step progression and remaining estimates, detects arrival, pauses on GPS loss, resumes on a fresh fix, and limits off-route reroutes. A dedicated one-second worker updates navigation independently of the camera. Guidance is spoken only on changes and is cancelled on STOP.
+- Browser GPS carries measurement timestamps and accuracy, rejects stale fixes, and expires after 30 seconds. Sharing persists across pages until explicitly stopped, role switch or tab closure. Real/mock/unavailable sources remain distinguished.
+- SOS status and submission use the actual configured service and active GPS. No emergency delivery is simulated.
 
-## Validation on 2026-10-05
+## Verification
 
-- Original baseline: 132 tests passed. Extended backend suite: 144 passed, one pre-existing Starlette/httpx deprecation warning.
-- Frontend production build and TypeScript lint passed; final checks repeated after refinements.
-- Real FastAPI and Vite ran together. Browser clicks tested role entry, Home, FIND, full READ, ASK, target COLOR, CURRENCY, MEDICINE, STOP, navigation start/stop with unavailable GPS, SOS confirmation/not-configured result, caregiver overview/location/safety/history/device, settings and larger text.
-- Stopped and restarted the real backend: UI showed backend offline/stale data and event reconnecting, then recovered automatically.
-- Both WebSocket transports connected. With ESP32 unreachable, binary stream carries backend standby frames; the UI hides these and shows Camera unavailable. Physical live camera/detection accuracy could not be verified.
-- Mobile 390px layout and enlarged text inspected; no horizontal overflow. Desktop inspection and final console check recorded below.
+The full backend regression suite passed **167 tests** after the voice changes (two warnings: optional Paddle ccache and existing Starlette/httpx deprecation). This includes wake-echo rejection and stale-capture cancellation. The camera-loop test now waits for its actual first processed frame with a ten-second hard deadline instead of assuming CPU warm-up always finishes within 1.5 seconds; its existing assertions remain.
 
-## Current external limits / honest status
+Frontend production build, TypeScript validation and five event-envelope tests passed. Controlled lifecycle tests exercise two sequential acoustic-boundary sessions through the actual parser, command bus, COLOR handler and pixel processing, verifying exactly one execution per session, actual computed color, speech wait, state ordering, and return to wake. Other supplied demo phrases are checked against the existing parser and registered dispatch. Test fixtures are never presented as live acoustic success.
 
-- This checkout's `.env` contains no Google key. Effective Google key presence is false; GPS and navigation are mock. Live Google billing/key/route/map success cannot be claimed. Controlled provider tests exercise real contract parsing and error paths without fabricating user data.
-- ESP32 capture endpoint is unreachable. YOLO loaded on CPU, Faster-Whisper and the real Hey Mycroft wake-word model loaded. Physical camera, depth and live navigation remain hardware/configuration acceptance tests.
-- PaddleOCR is missing in the installed runtime; OCR/currency/medicine correctly return unavailable/no frame. Ollama is unavailable in provider tests; ASK reports unavailable rather than invented answers.
-- SOS is disabled/not configured; no real emergency email was sent during QA. Existing SMTP tests cover success, failure and cooldown with controlled transport.
-- Focus and face recognition remain explicitly unavailable. No fake authentication or persisted history was added.
-- npm audit reports 7 advisories in the inherited React Router 6 / Tailwind 3 dependency trees (2 moderate, 5 high), with no nonbreaking fix reported for the root packages. The app uses client routing, not SSR hydration; dev server is bound to loopback. Dependency-major migration remains a separate compatibility task.
+Live browser checks across this continuation verified real webcam JPEG transport and detections, COLOR, actual unavailable service responses, STOP, role/page routes, GPS permission timeout, navigation start/stop without a fix, SOS not-configured response, backend offline/reconnection recovery, location-sharing lifecycle, mobile width and console state. Current live backend is `127.0.0.1:8000`, frontend `127.0.0.1:3000`. The Assist voice HUD renders real speech-start/finish and listening events.
 
-Google API references: https://developers.google.com/maps/documentation/routes/reference/rest/v2/TopLevel/computeRoutes and https://developers.google.com/maps/documentation/maps-static/start .
+An additional generated-audio fixture passed through the actual Hey Mycroft ONNX model (peak 0.9815, threshold 0.5); Faster-Whisper transcribed its separate command recording as **What color is this?**, parsed as COLOR. These generated inputs were local test fixtures, not live microphone recordings. SAPI completion behavior follows [Microsoft’s WaitUntilDone contract](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ms723616(v=vs.85)).
+
+**Live human wake → ASR → COLOR → spoken result → second wake acceptance is pending user execution/observation.** Model loading and controlled tests are not substituted for that acceptance test.
+
+## Remaining external or physical acceptance
+
+- Live Google route/map success needs a backend key with billing and Geocoding, Routes and Maps Static APIs enabled. No key was present; no real Google success is claimed.
+- Browser geolocation timed out in the earlier live check. No user location or route was fabricated.
+- ESP32 hardware acceptance remains outstanding; its provider is preserved. The real webcam is the active development source.
+- Ollama/model availability controls ASK; previous live calls reported unavailable. No invented scene response was added.
+- SOS is disabled/not configured; no real emergency email was sent. Existing controlled SMTP success/failure/cooldown tests pass.
+- Acoustic STOP is available when the sequential microphone session is listening, not as simultaneous speech barge-in while a model/TTS runs. The persistent STOP button remains immediately available.
+- Role selection is a local prototype, not authentication; history is bounded in-browser session data.
+- Inherited npm audit findings in React Router/Tailwind dependencies were recorded previously (7 advisories); a major dependency migration was not performed in this voice-integration change.
+
+## Key files
+
+`backend/app/services/pipeline.py`, `speech/tts.py`, `speech/asr.py`, `speech/voice_state.py`, `speech/wakeword.py`, `intelligence/command_bus.py`, `core/events.py`, `reasoning/ocr.py`, `backend/tests/test_voice_lifecycle_integration.py`, `frontend/src/app/VoiceStatus.tsx`, `pages/Assist.tsx`, `realtime.ts`, `store.ts`, `requirements.txt`, `.env.example`, and `README.md`.
+
+No credentials or captured audio are committed. One-time integration scripts from the earlier phase were removed in the preceding integration commit. An unrelated root `package-lock.json` observed during work is left untouched and excluded from this change.

@@ -94,8 +94,11 @@ def test_pipeline_synthetic_camera_loop():
     started = pipe.start()
     assert started is True
 
-    # Allow perception loop to initialize and process frames
-    time.sleep(1.5)
+    # Wait for actual CPU model warm-up instead of assuming a 1.5s startup.
+    # Retain a hard deadline so a dead worker still fails the test.
+    deadline = time.monotonic() + 10
+    while pipe.frames_processed == 0 and time.monotonic() < deadline:
+        time.sleep(0.05)
 
     assert pipe.frames_processed > 0
     annotated = pipe.get_annotated_frame()

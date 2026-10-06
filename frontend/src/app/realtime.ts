@@ -72,6 +72,11 @@ export function startRealtime() {
         if (r.status === "fulfilled") values[keys[i]] = r.value;
       });
       const online = results[0].status === "fulfilled";
+      if (results[0].status === "fulfilled") {
+        const speech = results[0].value.subsystems.speech_engine;
+        if (typeof speech === "object" && typeof speech.speaking === "boolean")
+          values.speaking = speech.speaking;
+      }
       useApp.getState().set({
         ...values,
         online,
@@ -92,6 +97,32 @@ export function startRealtime() {
         const e = parseEnvelope(message.data);
         if (!e) return;
         const store = useApp.getState();
+        if (e.type === "VOICE_STARTED")
+          store.set({
+            wakeDetectedAt: e.timestamp,
+            voiceTranscript: "",
+            voiceIntent: "",
+            voiceResult: null,
+            voiceError: "",
+          });
+        if (
+          e.type === "VOICE_TRANSCRIPT" &&
+          typeof e.data.transcript === "string"
+        )
+          store.set({ voiceTranscript: e.data.transcript });
+        if (e.type === "VOICE_EXECUTING" && typeof e.data.intent === "string")
+          store.set({ voiceIntent: e.data.intent, voiceResult: null });
+        if (e.type === "VOICE_COMMAND") store.set({ voiceResult: e.data });
+        if (e.type === "TTS_STARTED") store.set({ speaking: true });
+        if (e.type === "TTS_FINISHED") store.set({ speaking: false });
+        if (
+          e.type === "ERROR" &&
+          ["voice", "tts"].includes(String(e.data.source))
+        )
+          store.set({
+            voiceError: String(e.data.message || "Voice service error"),
+            speaking: false,
+          });
         if (
           e.type === "NAVIGATION_UPDATE" &&
           e.data.navigation &&
@@ -132,6 +163,11 @@ export function startRealtime() {
             "HAZARD",
             "VOICE_COMMAND",
             "VOICE_TRANSCRIPT",
+            "VOICE_STARTED",
+            "VOICE_EXECUTING",
+            "VOICE_STATE",
+            "TTS_STARTED",
+            "TTS_FINISHED",
             "SYSTEM_STATUS",
           ].includes(e.type)
         )
